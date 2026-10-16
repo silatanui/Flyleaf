@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}PDF review, Flyleaf{% endblock %}
+{% block body %}
+<div class="review-bar">
+  <div class="review-bar-inner">
+    <p class="review-file">{{ summary.filename }}</p>
+    <p class="review-score">{{ summary.detected_percent }}% detected as AI</p>
+    <a class="button ghost" href="{{ url_for('review_download', review_id=review_id) }}">Download</a>
+    <button type="button" class="button" id="print-review">Print</button>
+  </div>
+</div>
+<div class="sheet-stack">
+  {% for number in range(1, summary.page_count + 1) %}
+  <img src="{{ url_for('review_page', review_id=review_id, number=number) }}" alt="Page {{ number }} of the report">
+  {% endfor %}
+</div>
+<iframe id="print-frame" title="Printable report" hidden src="{{ url_for('review_file', review_id=review_id) }}"></iframe>
+{% endblock %}
+{% block scripts %}
+<script>
+  const bar = document.querySelector(".review-bar");
+  const nav = document.querySelector(".nav");
+  function placeBar() {
+    bar.style.top = nav.offsetHeight + "px";
+  }
+  placeBar();
+  window.addEventListener("resize", placeBar);
+
+  document.querySelector("#print-review").addEventListener("click", () => {
+    const frame = document.querySelector("#print-frame");
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    } catch (error) {
+      window.open(frame.src, "_blank");
+    }
+  });
+</script>
+{% endblock %}

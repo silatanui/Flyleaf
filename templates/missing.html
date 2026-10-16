@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Page not found, Flyleaf{% endblock %}
+{% block body %}
+<main class="missing">
+  <p class="eyebrow">404</p>
+  <h1>That page is not here.</h1>
+  <p>The review may have been cleared when Flyleaf restarted.</p>
+  <a class="button" href="{{ url_for('check') }}">Check a draft</a>
+</main>
+{% endblock %}

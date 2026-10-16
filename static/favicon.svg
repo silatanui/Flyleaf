@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Flyleaf">
+  <rect width="32" height="32" rx="8" fill="#24352c"/>
+  <path fill="#f6f1e7" d="M9 6.5h10.2L24.5 12v12.8a1.7 1.7 0 0 1-1.7 1.7H9A1.7 1.7 0 0 1 7.3 24.8V8.2A1.7 1.7 0 0 1 9 6.5z"/>
+  <path fill="#c46a45" d="M19.2 6.6V12H24.4z"/>
+  <path fill="#24352c" d="M10.2 16.2h9.2v1.7h-9.2z"/>
+  <path fill="#c46a45" d="M10.2 19.6h5.6v1.7h-5.6z"/>
+</svg>

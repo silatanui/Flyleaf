@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Flyleaf, free writing review{% endblock %}
+{% block body %}
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Portfolio project. Free to use.</p>
+      <h1>The first sheet, before the verdict.</h1>
+      <p class="lede">A flyleaf is the blank page at the front of a book. Flyleaf is that first look at a draft: paste a paragraph, or upload a PDF and download the marked pages. I am Tanui Kipngetich Sila, and anyone can use this for free.</p>
+      <div class="hero-actions">
+        <a class="button" href="{{ url_for('check') }}">Try our tool</a>
+        <a class="button ghost" href="#method">See how it works</a>
+      </div>
+    </div>
+    <figure class="hero-photo">
+      <img src="{{ url_for('static', filename='images/hero.jpg') }}" alt="A typewriter and handwritten pages on a wooden desk">
+    </figure>
+  </section>
+
+  <section class="intro" id="name">
+    <img class="intro-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="72" height="72">
+    <div>
+      <p class="eyebrow">The name</p>
+      <h2>A page you meet before the story.</h2>
+      <p>The folded corner in the mark is that flyleaf. The short rust line is a reader's note, the kind someone writes in the margin before they decide what the page means.</p>
+    </div>
+  </section>
+
+  <section class="band" id="method">
+    <div class="band-copy">
+      <p class="eyebrow">How it works</p>
+      <h2>Three steps, then the page is yours.</h2>
+      <ol class="steps">
+        <li>
+          <span>01</span>
+          <div>
+            <h3>Bring a draft</h3>
+            <p>Paste English prose, or upload a text-based PDF or Word file.</p>
+          </div>
+        </li>
+        <li>
+          <span>02</span>
+          <div>
+            <h3>Read the highlights</h3>
+            <p>Pasted text opens beside your draft. A PDF opens on its own page, with marks on the original lines.</p>
+          </div>
+        </li>
+        <li>
+          <span>03</span>
+          <div>
+            <h3>Keep the review</h3>
+            <p>Print or download the report. It opens with a cover and an overview, then every original page.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+    <figure>
+      <img src="{{ url_for('static', filename='images/study.jpg') }}" alt="A person writing in a notebook at a sunlit table">
+    </figure>
+  </section>
+
+  <section class="cards-section" id="ways">
+    <p class="eyebrow">Two ways in</p>
+    <h2>A paragraph beside you, or a PDF you can keep.</h2>
+    <div class="cards">
+      <article class="card">
+        <h3>Pasted text</h3>
+        <p>The draft stays on the left. Highlights, the flagged share, and the likelihood sit on the right, so you can read both at once.</p>
+      </article>
+      <article class="card">
+        <h3>Uploaded PDF</h3>
+        <p>Flyleaf opens the same report you can download: a cover, the percentage, then the original pages with cyan and purple marks.</p>
+      </article>
+      <article class="card">
+        <h3>A file to download</h3>
+        <p>The file and the preview are the same report. Cyan is AI-like. Purple is uncertain. The header and footer stay on every page.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="cards-section" id="scores">
+    <p class="eyebrow">How to read a score</p>
+    <h2>Three numbers, each with a small job.</h2>
+    <div class="cards">
+      <article class="card">
+        <h3>Flagged share</h3>
+        <p>How much of the scored writing sits in passages the model marks as AI-like. A mixed draft should not collapse into one color.</p>
+      </article>
+      <article class="card">
+        <h3>Likelihood</h3>
+        <p>The average chance across those passages. It is a reading of the draft, useful beside the highlights, not instead of them.</p>
+      </article>
+      <article class="card">
+        <h3>Confidence</h3>
+        <p>Lower on short text, on mixed sections, and on writing that may not be English. Under 300 words, treat the result as a sketch.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="cards-section" id="people">
+    <p class="eyebrow">Who it is for</p>
+    <h2>A second pair of eyes, with no login.</h2>
+    <div class="cards">
+      <article class="card">
+        <h3>Students</h3>
+        <p>Check a draft you are about to submit, and see which lines a reviewer might pause on.</p>
+      </article>
+      <article class="card">
+        <h3>Teachers</h3>
+        <p>Walk into a conversation with the highlighted page, rather than with a single percentage.</p>
+      </article>
+      <article class="card">
+        <h3>Writers</h3>
+        <p>Look at a passage you edited with a model, and keep the PDF if you want a record of that look.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="about" id="about">
+    <figure>
+      <img src="{{ url_for('static', filename='images/library.jpg') }}" alt="A stack of open books on a table">
+    </figure>
+    <div>
+      <p class="eyebrow">About this site</p>
+      <h2>Built as a portfolio, offered for free.</h2>
+      <p>My name is Tanui Kipngetich Sila. Flyleaf is a project I made to show a complete writing-review tool: a public homepage, a checker, and a downloadable PDF report.</p>
+      <p>There is no account and no fee. A percentage is a reason to reread a passage. It does not decide that someone used a chatbot, and it does not grade the work.</p>
+      <a class="button" href="{{ url_for('check') }}">Try our tool</a>
+    </div>
+  </section>
+
+  <section class="close">
+    <div>
+      <p class="eyebrow">Open a draft</p>
+      <h2>Bring a paragraph, or a PDF.</h2>
+      <p>English text works best. The tool is free, and the review stays on this computer only for as long as Flyleaf is running.</p>
+    </div>
+    <a class="button light" href="{{ url_for('check') }}">Try our tool</a>
+  </section>
+</main>
+{% endblock %}

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Flyleaf is a free writing review by Tanui Kipngetich Sila.">
+  <meta name="theme-color" content="#24352c">
+  <title>{% block title %}Flyleaf{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=8">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="nav">
+    <a class="logo" href="{{ url_for('home') }}">
+      <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="36" height="36">
+      <span class="logo-words">
+        <span class="logo-name">Flyleaf</span>
+        <span class="logo-tag">Writing review</span>
+      </span>
+    </a>
+    <nav class="nav-links">
+      <a href="{{ url_for('home') }}">Home</a>
+      <a href="{{ url_for('home') }}#method">How it works</a>
+      <a href="{{ url_for('home') }}#scores">Scores</a>
+      <a href="{{ url_for('home') }}#about">About</a>
+      <a href="{{ url_for('check') }}">Check a draft</a>
+    </nav>
+    <a class="nav-cta" href="{{ url_for('check') }}">Try the tool</a>
+  </header>
+  {% block body %}{% endblock %}
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div>
+        <a class="logo footer-logo" href="{{ url_for('home') }}">
+          <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="36" height="36">
+          <span class="logo-words">
+            <span class="logo-name">Flyleaf</span>
+            <span class="logo-tag">Writing review</span>
+          </span>
+        </a>
+        <p>A free first look at a draft, before anyone treats a percentage like a verdict.</p>
+      </div>
+      <div>
+        <h2>Explore</h2>
+        <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('home') }}#method">How it works</a>
+        <a href="{{ url_for('home') }}#scores">How to read a score</a>
+        <a href="{{ url_for('check') }}">Check a draft</a>
+      </div>
+      <div>
+        <h2>The project</h2>
+        <a href="{{ url_for('home') }}#about">Tanui Kipngetich Sila</a>
+        <p>Portfolio project. Free for anyone. No account.</p>
+      </div>
+      <div>
+        <h2>A careful note</h2>
+        <p>Highlights are a reason to reread a passage. They are not a finding of misconduct and they do not grade the work.</p>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <p>Flyleaf, 2026. Tanui Kipngetich Sila.</p>
+      <p>Photographs from Unsplash.</p>
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

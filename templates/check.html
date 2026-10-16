@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Check a draft, Flyleaf{% endblock %}
+{% block body %}
+<main class="check-main">
+  <div class="workspace">
+    <section class="panel write">
+      <div class="panel-head">
+        <p class="eyebrow">Free for anyone</p>
+        <h1>Check a draft</h1>
+        <p>English prose. The result sits on the right. A PDF opens on a new page.</p>
+        <p id="model-state" class="state">Starting…</p>
+      </div>
+      <textarea id="draft" rows="16" placeholder="Paste a paragraph or a full essay…"></textarea>
+      <div class="toolbar">
+        <label class="file">
+          <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain">
+          <span>Upload .txt, .docx, or .pdf</span>
+        </label>
+        <span id="file-name" class="file-name"></span>
+        <span id="word-count" class="count">0 words</span>
+      </div>
+      <div class="actions">
+        <button id="check" type="button" disabled>Check text</button>
+        <button id="sample-human" type="button" class="ghost">Human sample</button>
+        <button id="sample-ai" type="button" class="ghost">AI-style sample</button>
+      </div>
+    </section>
+
+    <section id="report" class="panel report">
+      <div id="report-empty" class="empty-report">
+        <p class="eyebrow">Review</p>
+        <h2>Highlights land here</h2>
+        <p>Paste a paragraph and run a check. Upload a PDF to read every page here, then print or download the report.</p>
+      </div>
+      <div id="report-body" hidden>
+        <div class="meters">
+          <div>
+            <p class="meter-label">Flagged share</p>
+            <p id="flagged" class="meter">-</p>
+          </div>
+          <div>
+            <p class="meter-label">Likelihood</p>
+            <p id="average" class="meter">-</p>
+          </div>
+          <div>
+            <p class="meter-label">Confidence</p>
+            <p id="confidence" class="meter confidence">-</p>
+          </div>
+        </div>
+        <ul id="warnings" class="warnings"></ul>
+        <div class="legend">
+          <span class="swatch ai">AI-like</span>
+          <span class="swatch uncertain">Uncertain</span>
+          <span class="swatch human">Human-like</span>
+        </div>
+        <article id="essay" class="essay"></article>
+        <p class="footnote">Each highlight follows the passage the model read. The score is a reason to reread, from a model trained on the public RAID collection of human and AI writing.</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="progress" class="progress" hidden>
+  <div class="progress-card">
+    <div class="ring" id="progress-ring">
+      <span id="progress-pct">0%</span>
+    </div>
+    <p id="progress-label">Reviewing the draft</p>
+    <p class="progress-note">Flyleaf is reading the whole draft.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+{% endblock %}
