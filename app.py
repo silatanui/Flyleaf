@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import os
+
+# Cap math libraries before torch is imported. Shared hosts kill a 64-thread pool.
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import io
 import re
 import threading
@@ -46,7 +54,7 @@ def _read_upload(storage) -> tuple[str, bytes | None, str]:
     return raw.decode("utf-8", errors="replace"), None, filename
 
 
-def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str) -> None:
+def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, prefix: str = "") -> None:
     def progress(done: int, total: int, message: str) -> None:
         del message
         with _jobs_lock:
@@ -82,7 +90,7 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str) -> 
             with _jobs_lock:
                 _reviews[review_id] = {"path": path, "summary": summary}
             result["review_id"] = review_id
-            result["review_url"] = f"/review/{review_id}"
+            result["review_url"] = f"{prefix}/review/{review_id}"
         with _jobs_lock:
             _jobs[job_id]["status"] = "done"
             _jobs[job_id]["percent"] = 100
@@ -248,7 +256,8 @@ def analyze():
             "result": None,
             "error": None,
         }
-    threading.Thread(target=_run_job, args=(job_id, text, pdf_bytes, filename), daemon=True).start()
+    prefix = request.script_root.rstrip("/")
+    threading.Thread(target=_run_job, args=(job_id, text, pdf_bytes, filename, prefix), daemon=True).start()
     return jsonify({"job_id": job_id})
 
 
@@ -278,7 +287,19 @@ def _load_models() -> None:
         app.logger.exception("Humanizer failed to load")
 
 
-threading.Thread(target=_load_models, daemon=True).start()
+def _start_model_load() -> None:
+    try:
+        threading.Thread(target=_load_models, daemon=True).start()
+    except RuntimeError:
+        app.logger.exception("Flyleaf could not start the model loader")
+        message = "The host could not start a worker thread."
+        detector.status = "error"
+        detector.error = message
+        humanizer.status = "error"
+        humanizer.error = message
+
+
+_start_model_load()
 
 
 if __name__ == "__main__":

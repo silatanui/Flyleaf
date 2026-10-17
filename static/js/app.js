@@ -21,6 +21,24 @@ const samples = {
 let detectorReady = false;
 let humanizerReady = false;
 
+function appRoot() {
+  const script = document.querySelector("script[src*='app.js']");
+  const src = script ? script.getAttribute("src") || "" : "";
+  const marker = "/static/js/app.js";
+  const index = src.indexOf(marker);
+  return index > 0 ? src.slice(0, index) : "";
+}
+
+const root = appRoot();
+
+function appPath(path) {
+  if (!path) return root || "/";
+  if (/^https?:\/\//i.test(path)) return path;
+  if (root && (path === root || path.startsWith(`${root}/`))) return path;
+  if (path.startsWith("/")) return `${root}${path}`;
+  return `${root}/${path}`;
+}
+
 function words(value) {
   const found = value.trim().match(/\b[\w']+\b/g);
   return found ? found.length : 0;
@@ -182,8 +200,8 @@ function buttonsAvailable() {
 
 async function pollReady() {
   const [detectorResponse, humanResponse] = await Promise.all([
-    fetch("/api/status"),
-    fetch("/api/humanize/status"),
+    fetch(appPath("/api/status")),
+    fetch(appPath("/api/humanize/status")),
   ]);
   const detector = await detectorResponse.json();
   const human = await humanResponse.json();
@@ -204,8 +222,12 @@ async function pollReady() {
 
 async function waitUntilReady() {
   for (;;) {
-    const settled = await pollReady();
-    if (settled) return;
+    try {
+      const settled = await pollReady();
+      if (settled) return;
+    } catch (error) {
+      modelState.textContent = "Flyleaf could not reach the checker.";
+    }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 }
@@ -236,7 +258,7 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
 
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, 400));
-      const jobResponse = await fetch(`/api/jobs/${payload.job_id}`);
+      const jobResponse = await fetch(appPath(`/api/jobs/${payload.job_id}`));
       const job = await jobResponse.json();
       if (!jobResponse.ok) throw new Error(job.error || "The job was lost.");
       if (typeof job.percent === "number") target = Math.max(target, job.percent);
@@ -262,17 +284,17 @@ checkButton.addEventListener("click", () => {
   if (selectedPdf() || (fileInput.files.length > 0 && words(draft.value) < 20)) {
     const form = new FormData();
     form.append("file", fileInput.files[0]);
-    runJob("/api/analyze", form, true, "Reviewing the draft", "Opening the review", (result) => {
+    runJob(appPath("/api/analyze"), form, true, "Reviewing the draft", "Opening the review", (result) => {
       if (result.review_url) {
-        const opened = window.open(result.review_url, "_blank");
-        if (!opened) window.location = result.review_url;
+        const opened = window.open(appPath(result.review_url), "_blank");
+        if (!opened) window.location = appPath(result.review_url);
         return;
       }
       showReport(result);
     });
     return;
   }
-  runJob("/api/analyze", { text: draft.value }, false, "Reviewing the draft", "Opening the review", showReport);
+  runJob(appPath("/api/analyze"), { text: draft.value }, false, "Reviewing the draft", "Opening the review", showReport);
 });
 
 humanizeButton.addEventListener("click", () => {
@@ -280,7 +302,7 @@ humanizeButton.addEventListener("click", () => {
     window.alert("Paste a paragraph to humanize.");
     return;
   }
-  runJob("/api/humanize", { text: draft.value }, false, "Rewriting the draft", "Rewrite ready", showRewrite);
+  runJob(appPath("/api/humanize"), { text: draft.value }, false, "Rewriting the draft", "Rewrite ready", showRewrite);
 });
 
 document.querySelector("#copy").addEventListener("click", async () => {
