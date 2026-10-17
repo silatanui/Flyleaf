@@ -11,6 +11,7 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, render_template, request, send_file
 
 from detector.engine import detector
+from detector.humanizer import humanizer
 from detector.report_pdf import build_reviewed_pdf, pdf_text, write_preview_images
 
 ROOT = Path(__file__).resolve().parent
@@ -104,6 +105,11 @@ def check():
     return render_template("check.html")
 
 
+@app.get("/humanize")
+def humanize_page():
+    return render_template("check.html")
+
+
 @app.get("/review/<review_id>/pages/<int:number>")
 def review_page(review_id: str, number: int):
     path = REVIEW_DIR / review_id / f"{number}.png"
@@ -149,6 +155,64 @@ def review_download(review_id: str):
 @app.get("/api/status")
 def status():
     return jsonify({"status": detector.status, "error": detector.error, "model": "desklib/ai-text-detector-v1.01"})
+
+
+@app.get("/api/humanize/status")
+def humanize_status():
+    return jsonify({"status": humanizer.status, "error": humanizer.error, "model": humanizer.model_name})
+
+
+def _run_humanize(job_id: str, text: str) -> None:
+    def progress(done: int, total: int) -> None:
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if job is None:
+                return
+            job["done"] = done
+            job["total"] = total
+            job["percent"] = 0 if total <= 0 else round(100 * done / total)
+
+    try:
+        result = humanizer.rewrite(text, progress=progress)
+        with _jobs_lock:
+            _jobs[job_id]["status"] = "done"
+            _jobs[job_id]["percent"] = 100
+            _jobs[job_id]["result"] = result
+            _jobs[job_id]["message"] = "Rewrite ready"
+    except Exception as exc:
+        with _jobs_lock:
+            _jobs[job_id]["status"] = "error"
+            _jobs[job_id]["error"] = str(exc)
+            _jobs[job_id]["message"] = "The rewrite could not be finished"
+
+
+@app.post("/api/humanize")
+def humanize_api():
+    if humanizer.status == "loading":
+        return jsonify({"error": "The humanizer is still getting ready. Try again in a minute."}), 503
+    if humanizer.status == "error":
+        return jsonify({"error": humanizer.error or "The humanizer failed to load."}), 500
+    text = ""
+    if request.is_json:
+        text = (request.get_json(silent=True) or {}).get("text") or ""
+    else:
+        text = request.form.get("text") or ""
+    text = text.strip()
+    if not text:
+        return jsonify({"error": "Add some text to humanize."}), 400
+    job_id = uuid.uuid4().hex
+    with _jobs_lock:
+        _jobs[job_id] = {
+            "status": "running",
+            "done": 0,
+            "total": 1,
+            "percent": 6,
+            "message": "Rewriting the draft",
+            "result": None,
+            "error": None,
+        }
+    threading.Thread(target=_run_humanize, args=(job_id, text), daemon=True).start()
+    return jsonify({"job_id": job_id})
 
 
 @app.post("/api/analyze")
@@ -203,14 +267,18 @@ def missing(_error):
     return render_template("missing.html"), 404
 
 
-def _load_model() -> None:
+def _load_models() -> None:
     try:
         detector.load()
     except Exception:
         app.logger.exception("Detector failed to load")
+    try:
+        humanizer.load()
+    except Exception:
+        app.logger.exception("Humanizer failed to load")
 
 
-threading.Thread(target=_load_model, daemon=True).start()
+threading.Thread(target=_load_models, daemon=True).start()
 
 
 if __name__ == "__main__":

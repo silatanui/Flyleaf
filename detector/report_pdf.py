@@ -13,9 +13,9 @@ FONT_FILE = ROOT / "static" / "fonts" / "JosefinSans-Regular.ttf"
 
 WHITE = (1, 1, 1)
 INK = (0.12, 0.14, 0.16)
-MUTED = (0.38, 0.42, 0.46)
+MUTED = (0.28, 0.34, 0.40)
 RULE = (0.86, 0.88, 0.90)
-BLUE = (0.12, 0.40, 0.91)
+BLUE = (0 / 255, 87 / 255, 184 / 255)
 CYAN = (184 / 255, 232 / 255, 240 / 255)
 PURPLE = (214 / 255, 196 / 255, 240 / 255)
 BOX = (0.96, 0.97, 0.98)
@@ -24,21 +24,45 @@ HEADER_H = 46
 FOOTER_H = 40
 
 
-def page_paragraphs(page) -> str:
-    """Join wrapped lines into paragraphs so a sentence is not split at the margin."""
-    paragraphs = []
+def _page_lines(page) -> list[dict]:
+    rows = []
     for block in page.get_text("dict").get("blocks", []):
         if block.get("type") != 0:
             continue
-        lines = []
         for line in block.get("lines", []):
             text = "".join(span.get("text", "") for span in line.get("spans", [])).strip()
-            if text:
-                lines.append(text)
-        paragraph = " ".join(lines).strip()
-        if paragraph:
-            paragraphs.append(paragraph)
-    return "\n".join(paragraphs)
+            if not text:
+                continue
+            x0, y0, _x1, y1 = line["bbox"]
+            size = max((span.get("size") or 12 for span in line.get("spans", [])), default=12)
+            rows.append({"text": text, "x0": x0, "y0": y0, "y1": y1, "size": size})
+    rows.sort(key=lambda row: (row["y0"], row["x0"]))
+    return rows
+
+
+def _join_wrapped(left: str, right: str) -> str:
+    if left.endswith("-") and right[:1].islower():
+        return f"{left[:-1]}{right}"
+    return f"{left} {right}"
+
+
+def page_paragraphs(page) -> str:
+    """Join wrapped print lines back into paragraphs. A line break is not a new sentence."""
+    rows = _page_lines(page)
+    if not rows:
+        return ""
+    paragraphs = [rows[0]["text"]]
+    previous = rows[0]
+    for row in rows[1:]:
+        gap = row["y0"] - previous["y1"]
+        same_size = abs(row["size"] - previous["size"]) < 1.5
+        wrapped = same_size and 0 <= gap <= max(previous["size"], 12) * 0.9
+        if wrapped:
+            paragraphs[-1] = _join_wrapped(paragraphs[-1], row["text"])
+        else:
+            paragraphs.append(row["text"])
+        previous = row
+    return "\n".join(paragraph.strip() for paragraph in paragraphs if paragraph.strip())
 
 
 def pdf_text(raw: bytes) -> str:
@@ -130,29 +154,44 @@ def _wrap(text: str, fontobj, size: float, width: float) -> list[str]:
     return lines
 
 
-def _write(page, fontname, fontobj, text, x, y, width, size, color, leading=None) -> float:
+def _put(page, point, text, fontsize, fontname, color, heavy=False) -> None:
+    page.insert_text(point, text, fontsize=fontsize, fontname=fontname, color=color)
+
+
+def _write(page, fontname, fontobj, text, x, y, width, size, color, leading=None, heavy=False) -> float:
     step = leading or (size + 4)
     for line in _wrap(text, fontobj, size, width):
-        page.insert_text((x, y), line, fontsize=size, fontname=fontname, color=color)
+        _put(page, (x, y), line, size, fontname, color, heavy)
         y += step
     return y
 
 
-def _mark(page) -> None:
-    page.draw_rect(fitz.Rect(16, 14, 30, 30), color=None, fill=BLUE, radius=0.4)
-    page.draw_rect(fitz.Rect(19, 17, 27, 27), color=None, fill=WHITE)
+def _leaf(page, x, y, size=12) -> None:
+    def point(px, py):
+        return fitz.Point(x + size * px / 32, y + size * py / 32)
+
+    shape = page.new_shape()
+    shape.draw_bezier(point(16, 2), point(22, 8), point(27, 15), point(24.5, 22.5))
+    shape.draw_bezier(point(24.5, 22.5), point(23, 27), point(19.2, 29), point(16, 30.2))
+    shape.draw_bezier(point(16, 30.2), point(12.8, 29), point(9, 27), point(7.5, 22.5))
+    shape.draw_bezier(point(7.5, 22.5), point(5, 15), point(10, 8), point(16, 2))
+    shape.finish(color=BLUE, fill=BLUE, closePath=True, width=0.2)
+    shape.draw_bezier(point(16, 26.5), point(16.2, 18), point(17.4, 12), point(21.5, 6.5))
+    shape.finish(color=(0.957, 0.969, 0.976), width=max(0.4, size * 0.04))
+    shape.commit()
 
 
-def _bar(page, width, height, fontname, fontobj, number: int, total: int, kind: str, filename: str, top: bool) -> None:
+def _bar(page, width, height, fontname, fontobj, number: int, total: int, kind: str, filename: str, top: bool, heavy=False) -> None:
     if top:
         y_text = 28
         page.draw_rect(fitz.Rect(0, HEADER_H - 0.7, width, HEADER_H), color=None, fill=RULE)
-        _mark(page)
-        page.insert_text((36, y_text), "Flyleaf", fontsize=12, fontname=fontname, color=BLUE)
+        _put(page, (16, y_text), "Fly", 13, fontname, BLUE, heavy)
+        _leaf(page, 16 + _width(fontobj, "Fly", 13) + 4, y_text - 12, 13)
     else:
         y_text = height - 16
         page.draw_rect(fitz.Rect(0, height - FOOTER_H, width, height - FOOTER_H + 0.7), color=None, fill=RULE)
-        page.insert_text((16, y_text), "Flyleaf", fontsize=10, fontname=fontname, color=BLUE)
+        _put(page, (16, y_text), "Fly", 11, fontname, BLUE, heavy)
+        _leaf(page, 16 + _width(fontobj, "Fly", 11) + 3, y_text - 10, 11)
     label = f"Page {number} of {total} - {kind}"
     label_w = _width(fontobj, label, 9)
     page.insert_text(((width - label_w) / 2, y_text if not top else 28), label, fontsize=9, fontname=fontname, color=MUTED)
@@ -166,15 +205,15 @@ def _bar(page, width, height, fontname, fontobj, number: int, total: int, kind: 
 
 def _cover(page, width, fontname, fontobj, result: dict, filename: str, file_size: int, total: int) -> None:
     _use_font(page, fontname)
-    _bar(page, width, page.rect.height, fontname, fontobj, 1, total, "Cover Page", filename, True)
-    _bar(page, width, page.rect.height, fontname, fontobj, 1, total, "Cover Page", filename, False)
+    _bar(page, width, page.rect.height, fontname, fontobj, 1, total, "Cover Page", filename, True, heavy=True)
+    _bar(page, width, page.rect.height, fontname, fontobj, 1, total, "Cover Page", filename, False, heavy=True)
     title = Path(filename).stem.replace("_", " ") or "Draft"
     y = 168
-    y = _write(page, fontname, fontobj, title, 48, y, width - 96, 26, INK, leading=30)
+    y = _write(page, fontname, fontobj, title, 48, y, width - 96, 26, INK, leading=30, heavy=True)
     y += 6
-    page.insert_text((48, y), "AI writing report", fontsize=14, fontname=fontname, color=MUTED)
+    _put(page, (48, y), "AI writing report", 14, fontname, MUTED, heavy=True)
     y += 48
-    page.insert_text((48, y), "Document details", fontsize=12, fontname=fontname, color=INK)
+    _put(page, (48, y), "Document details", 12, fontname, INK, heavy=True)
     y += 22
     when = datetime.now().strftime("%b %d, %Y, %I:%M %p")
     size_mb = file_size / (1024 * 1024)
@@ -183,12 +222,12 @@ def _cover(page, width, fontname, fontobj, result: dict, filename: str, file_siz
         ("File name", filename),
         ("Reviewed", when),
         ("File size", size_label),
-        ("Qualifying words", f"{int(result.get('scored_words') or 0):,}"),
+        ("Words scored", f"{int(result.get('scored_words') or 0):,}"),
     )
     for label, value in rows:
-        page.insert_text((48, y), label, fontsize=9, fontname=fontname, color=MUTED)
+        _put(page, (48, y), label, 9, fontname, MUTED, heavy=True)
         y += 14
-        y = _write(page, fontname, fontobj, str(value), 48, y, 250, 11, INK, leading=14)
+        y = _write(page, fontname, fontobj, str(value), 48, y, 250, 11, INK, leading=14, heavy=True)
         y += 10
     box = fitz.Rect(width - 230, 250, width - 48, 390)
     page.draw_rect(box, color=None, fill=BOX)
@@ -199,16 +238,16 @@ def _cover(page, width, fontname, fontobj, result: dict, filename: str, file_siz
     )
     fy = 278
     for value, label in facts:
-        page.insert_text((box.x0 + 16, fy), value, fontsize=16, fontname=fontname, color=INK)
-        page.insert_text((box.x0 + 16, fy + 16), label, fontsize=10, fontname=fontname, color=MUTED)
+        _put(page, (box.x0 + 16, fy), value, 16, fontname, INK, heavy=True)
+        _put(page, (box.x0 + 16, fy + 16), label, 10, fontname, MUTED, heavy=True)
         fy += 36
 
 
 def _overview(page, width, fontname, fontobj, result: dict, filename: str, total: int) -> None:
     _use_font(page, fontname)
     height = page.rect.height
-    _bar(page, width, height, fontname, fontobj, 2, total, "AI Writing Overview", filename, True)
-    _bar(page, width, height, fontname, fontobj, 2, total, "AI Writing Overview", filename, False)
+    _bar(page, width, height, fontname, fontobj, 2, total, "AI Writing Overview", filename, True, heavy=True)
+    _bar(page, width, height, fontname, fontobj, 2, total, "AI Writing Overview", filename, False, heavy=True)
     detected = int(result.get("detected_percent") or 0)
     ai_only = int(result.get("flagged_percent") or 0)
     unsure = int(result.get("uncertain_percent") or 0)
@@ -216,24 +255,25 @@ def _overview(page, width, fontname, fontobj, result: dict, filename: str, total
     y = 78
     content_w = width - 96
     score = f"{detected}%"
-    page.insert_text((x, y), score, fontsize=32, fontname=fontname, color=BLUE)
-    page.insert_text((x + _width(fontobj, score, 32) + 8, y), "detected as AI", fontsize=18, fontname=fontname, color=BLUE)
+    _put(page, (x, y), score, 32, fontname, BLUE, heavy=True)
+    _put(page, (x + _width(fontobj, score, 32) + 8, y), "detected as AI", 18, fontname, BLUE, heavy=True)
     y += 22
     y = _write(
         page,
         fontname,
         fontobj,
-        "The percentage is the share of qualifying text read as AI-like, together with qualifying text the model could not place cleanly.",
+        "The percentage covers the whole document. Passages are read together, not one printed line at a time.",
         x,
         y,
         content_w * 0.62,
-        10,
-        MUTED,
-        leading=14,
+        11,
+        INK,
+        leading=15,
+        heavy=True,
     )
     box = fitz.Rect(x + content_w * 0.66, 70, width - 40, 168)
     page.draw_rect(box, color=None, fill=CAUTION)
-    page.insert_text((box.x0 + 12, box.y0 + 20), "Caution: Review required.", fontsize=10, fontname=fontname, color=BLUE)
+    _put(page, (box.x0 + 12, box.y0 + 20), "Caution: Review required.", 11, fontname, BLUE, heavy=True)
     _write(
         page,
         fontname,
@@ -242,27 +282,28 @@ def _overview(page, width, fontname, fontobj, result: dict, filename: str, total
         box.x0 + 12,
         box.y0 + 38,
         box.width - 24,
-        9,
+        10,
         INK,
-        leading=12,
+        leading=13,
+        heavy=True,
     )
     y = max(y + 18, 196)
-    page.insert_text((x, y), "Detection groups", fontsize=14, fontname=fontname, color=INK)
+    _put(page, (x, y), "Detection groups", 15, fontname, INK, heavy=True)
     y += 26
     groups = (
-        (CYAN, "AI-generated only", ai_only, "Qualifying text read as likely written by a language model."),
-        (PURPLE, "Uncertain", unsure, "Qualifying text between a human reading and an AI reading."),
+        (CYAN, "AI-generated only", ai_only, "Passages read as likely written by a language model."),
+        (PURPLE, "Uncertain", unsure, "Passages between a human reading and an AI reading."),
     )
     for fill, name, percent, meaning in groups:
         page.draw_rect(fitz.Rect(x, y - 10, x + 12, y + 2), color=None, fill=fill)
-        page.insert_text((x + 20, y), name, fontsize=11, fontname=fontname, color=INK)
+        _put(page, (x + 20, y), name, 12, fontname, INK, heavy=True)
         percent_label = f"{percent}%"
-        page.insert_text((width - 48 - _width(fontobj, percent_label, 11), y), percent_label, fontsize=11, fontname=fontname, color=BLUE)
+        _put(page, (width - 48 - _width(fontobj, percent_label, 12), y), percent_label, 12, fontname, BLUE, heavy=True)
         y += 16
-        y = _write(page, fontname, fontobj, meaning, x + 20, y, content_w - 20, 10, MUTED, leading=13)
+        y = _write(page, fontname, fontobj, meaning, x + 20, y, content_w - 20, 11, INK, leading=14, heavy=True)
         y += 12
     y += 6
-    page.insert_text((x, y), "Disclaimer", fontsize=12, fontname=fontname, color=INK)
+    _put(page, (x, y), "Disclaimer", 13, fontname, INK, heavy=True)
     y += 16
     y = _write(
         page,
@@ -272,24 +313,26 @@ def _overview(page, width, fontname, fontobj, result: dict, filename: str, total
         x,
         y,
         content_w,
-        10,
-        MUTED,
-        leading=13,
+        11,
+        INK,
+        leading=14,
+        heavy=True,
     )
     y += 14
-    page.insert_text((x, y), "What qualifying text means", fontsize=12, fontname=fontname, color=INK)
+    _put(page, (x, y), "How to read the marks", 13, fontname, INK, heavy=True)
     y += 16
     _write(
         page,
         fontname,
         fontobj,
-        "Only long-form sentences inside paragraphs are scored. Headings, short lines, and lists stay out of the percentage, so the highlights and the percentage can differ. Cyan marks AI-like sentences. Purple marks uncertain sentences. Prepared as a free portfolio project by Tanui Kipngetich Sila.",
+        "Every extracted word is included. Cyan marks a passage read as AI-like. Purple marks a passage the model could not place. A different detector can still disagree, including with Turnitin. Prepared as a free portfolio project by Tanui Kipngetich Sila.",
         x,
         y,
         content_w,
-        10,
-        MUTED,
-        leading=13,
+        11,
+        INK,
+        leading=14,
+        heavy=True,
     )
 
 

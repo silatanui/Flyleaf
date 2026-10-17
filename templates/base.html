@@ -4,27 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Flyleaf is a free writing review by Tanui Kipngetich Sila.">
-  <meta name="theme-color" content="#24352c">
+  <meta name="theme-color" content="#0057B8">
   <title>{% block title %}Flyleaf{% endblock %}</title>
-  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=8">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}?v=16" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=26">
   {% block head %}{% endblock %}
 </head>
 <body>
   <header class="nav">
     <a class="logo" href="{{ url_for('home') }}">
-      <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="36" height="36">
-      <span class="logo-words">
-        <span class="logo-name">Flyleaf</span>
-        <span class="logo-tag">Writing review</span>
-      </span>
+      <span class="logo-name">Fly</span>
+      <img src="{{ url_for('static', filename='favicon.svg') }}?v=16" alt="" width="28" height="28">
     </a>
     <nav class="nav-links">
       <a href="{{ url_for('home') }}">Home</a>
       <a href="{{ url_for('home') }}#method">How it works</a>
       <a href="{{ url_for('home') }}#scores">Scores</a>
       <a href="{{ url_for('home') }}#about">About</a>
-      <a href="{{ url_for('check') }}">Check a draft</a>
+      <a href="{{ url_for('check') }}">Check for AI</a>
     </nav>
     <a class="nav-cta" href="{{ url_for('check') }}">Try the tool</a>
   </header>
@@ -33,11 +30,8 @@
     <div class="footer-grid">
       <div>
         <a class="logo footer-logo" href="{{ url_for('home') }}">
-          <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="36" height="36">
-          <span class="logo-words">
-            <span class="logo-name">Flyleaf</span>
-            <span class="logo-tag">Writing review</span>
-          </span>
+          <span class="logo-name">Fly</span>
+          <img src="{{ url_for('static', filename='favicon.svg') }}?v=16" alt="" width="28" height="28">
         </a>
         <p>A free first look at a draft, before anyone treats a percentage like a verdict.</p>
       </div>
@@ -46,7 +40,7 @@
         <a href="{{ url_for('home') }}">Home</a>
         <a href="{{ url_for('home') }}#method">How it works</a>
         <a href="{{ url_for('home') }}#scores">How to read a score</a>
-        <a href="{{ url_for('check') }}">Check a draft</a>
+        <a href="{{ url_for('check') }}">Check for AI</a>
       </div>
       <div>
         <h2>The project</h2>

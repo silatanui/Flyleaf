@@ -20,8 +20,6 @@ MODEL_ID = "desklib/ai-text-detector-v1.01"
 CACHE_DIR = ROOT / "models"
 LOCAL_DIR = CACHE_DIR / "desklib"
 SECTION_WORDS = 120
-MIN_SENTENCE_WORDS = 12
-QUALIFYING_WORDS = 40
 AI_CUTOFF = 0.65
 HUMAN_CUTOFF = 0.35
 
@@ -82,50 +80,60 @@ def _word_chunks(sentence: str, limit: int) -> list[str]:
     return [" ".join(words[index:index + limit]) for index in range(0, len(words), limit)]
 
 
-def pack_sections(sentences: list[str], words_per_section: int = SECTION_WORDS) -> list[dict]:
-    """Score long-form passages, and leave headings and short lines out of the percentage."""
+def pack_sections(text: str, words_per_section: int = SECTION_WORDS) -> list[dict]:
+    """Score every paragraph. Short lines stay with the paragraph they introduce."""
+    paragraphs = [part.strip() for part in re.split(r"\n+", text) if part.strip()]
     sections: list[dict] = []
-    bucket: list[str] = []
-    count = 0
+    short: list[str] = []
+    short_words = 0
 
-    def flush() -> None:
-        nonlocal bucket, count
-        if not bucket:
+    def add_section(parts: list[str]) -> None:
+        blob = " ".join(parts).strip()
+        sentences = [sentence for sentence in split_sentences(blob) if word_count(sentence)]
+        if not sentences:
             return
-        sections.append(
-            {
-                "sentences": bucket,
-                "text": " ".join(bucket),
-                "words": count,
-                "qualifying": count >= QUALIFYING_WORDS,
-            }
-        )
-        bucket = []
+        bucket: list[str] = []
         count = 0
 
-    for sentence in sentences:
-        for piece in _word_chunks(sentence, words_per_section):
-            words = word_count(piece)
-            if words < MIN_SENTENCE_WORDS:
-                flush()
-                sections.append(
-                    {
-                        "sentences": [piece],
-                        "text": piece,
-                        "words": words,
-                        "qualifying": False,
-                    }
-                )
-                continue
-            if bucket and count + words > words_per_section:
-                flush()
-            bucket.append(piece)
-            count += words
-    flush()
-    if sections and not any(section["qualifying"] for section in sections):
-        for section in sections:
-            if section["words"] >= 8:
-                section["qualifying"] = True
+        def flush() -> None:
+            nonlocal bucket, count
+            if not bucket:
+                return
+            sections.append(
+                {
+                    "sentences": bucket,
+                    "text": " ".join(bucket),
+                    "words": count,
+                    "qualifying": True,
+                }
+            )
+            bucket = []
+            count = 0
+
+        for sentence in sentences:
+            for piece in _word_chunks(sentence, words_per_section):
+                words = word_count(piece)
+                if bucket and count + words > words_per_section:
+                    flush()
+                bucket.append(piece)
+                count += words
+        flush()
+
+    for paragraph in paragraphs:
+        words = word_count(paragraph)
+        if words >= 25:
+            add_section(short + [paragraph])
+            short = []
+            short_words = 0
+            continue
+        short.append(paragraph)
+        short_words += words
+        if short_words >= words_per_section:
+            add_section(short)
+            short = []
+            short_words = 0
+    if short:
+        add_section(short)
     return sections
 
 
@@ -227,7 +235,10 @@ class Detector:
             local_only = weights_ready()
             self._tokenizer = AutoTokenizer.from_pretrained(source, local_files_only=local_only, cache_dir=str(CACHE_DIR))
             self._model = DesklibAIDetectionModel.from_pretrained(
-                source, local_files_only=local_only, cache_dir=str(CACHE_DIR)
+                source,
+                local_files_only=local_only,
+                cache_dir=str(CACHE_DIR),
+                low_cpu_mem_usage=False,
             )
             self._model.to(self._device)
             self._model.eval()
@@ -260,15 +271,14 @@ class Detector:
             raise ValueError("Paste at least a short paragraph. A few words is not enough to score.")
 
         language_warning = english_hint(cleaned)
-        sentences = split_sentences(cleaned)
-        sections = pack_sections(sentences)
+        sections = pack_sections(cleaned)
         if not sections:
             raise ValueError("No scoreable text was found.")
 
         with self._lock:
             qualifying = [section for section in sections if section["qualifying"]]
             total = len(qualifying) or 1
-            batch = 4
+            batch = 8
             for start in range(0, len(qualifying), batch):
                 if progress:
                     progress(start, total, "Reviewing the draft")

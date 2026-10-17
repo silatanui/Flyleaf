@@ -1,52 +1,62 @@
 {% extends "base.html" %}
-{% block title %}Check a draft, Flyleaf{% endblock %}
+{% block title %}Check for AI, Flyleaf{% endblock %}
 {% block body %}
 <main class="check-main">
   <div class="workspace">
     <section class="panel write">
       <div class="panel-head">
         <p class="eyebrow">Free for anyone</p>
-        <h1>Check a draft</h1>
-        <p>English prose. The result sits on the right. A PDF opens on a new page.</p>
+        <h1>Check for AI</h1>
+        <p>Paste English prose, or upload a PDF, Word, or text file. A PDF opens as a marked report.</p>
         <p id="model-state" class="state">Starting…</p>
       </div>
-      <textarea id="draft" rows="16" placeholder="Paste a paragraph or a full essay…"></textarea>
-      <div class="toolbar">
-        <label class="file">
-          <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain">
-          <span>Upload .txt, .docx, or .pdf</span>
-        </label>
-        <span id="file-name" class="file-name"></span>
-        <span id="word-count" class="count">0 words</span>
-      </div>
+      <textarea id="draft" rows="14" placeholder="Paste a paragraph or a full essay…"></textarea>
+      <label class="upload" id="upload">
+        <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+        <span class="upload-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 16 V5"></path>
+            <path d="M8 9 L12 5 L16 9"></path>
+            <path d="M5 19 H19"></path>
+          </svg>
+        </span>
+        <span class="upload-copy">
+          <strong id="upload-title">Upload a PDF, Word file, or .txt</strong>
+          <span id="file-name">A PDF opens as a marked report you can download.</span>
+        </span>
+      </label>
       <div class="actions">
-        <button id="check" type="button" disabled>Check text</button>
+        <button id="check" type="button" class="with-icon" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10" cy="10" r="6"></circle>
+            <path d="M14.5 14.5 L20 20"></path>
+          </svg>
+          Check for AI
+        </button>
+        <button id="humanize" type="button" class="with-icon secondary" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20 L9 18 L19 8 L15 4 L5 14 Z"></path>
+            <path d="M13 6 L17 10"></path>
+          </svg>
+          Humanize text
+        </button>
         <button id="sample-human" type="button" class="ghost">Human sample</button>
         <button id="sample-ai" type="button" class="ghost">AI-style sample</button>
+        <span id="word-count" class="count">0 words</span>
       </div>
     </section>
 
     <section id="report" class="panel report">
       <div id="report-empty" class="empty-report">
-        <p class="eyebrow">Review</p>
-        <h2>Highlights land here</h2>
-        <p>Paste a paragraph and run a check. Upload a PDF to read every page here, then print or download the report.</p>
+        <p class="eyebrow">Result</p>
+        <h2>The reading lands here</h2>
+        <p>Check for AI uses a semicircle, like a speedometer. The shaded arc fades from green to red as the suspicious share rises.</p>
       </div>
+
       <div id="report-body" hidden>
-        <div class="meters">
-          <div>
-            <p class="meter-label">Flagged share</p>
-            <p id="flagged" class="meter">-</p>
-          </div>
-          <div>
-            <p class="meter-label">Likelihood</p>
-            <p id="average" class="meter">-</p>
-          </div>
-          <div>
-            <p class="meter-label">Confidence</p>
-            <p id="confidence" class="meter confidence">-</p>
-          </div>
-        </div>
+        <div id="donut" class="donut"></div>
+        <p id="donut-blurb" class="donut-blurb"></p>
+        <p id="confidence-line" class="meter-note donut-note"></p>
         <ul id="warnings" class="warnings"></ul>
         <div class="legend">
           <span class="swatch ai">AI-like</span>
@@ -54,7 +64,21 @@
           <span class="swatch human">Human-like</span>
         </div>
         <article id="essay" class="essay"></article>
-        <p class="footnote">Each highlight follows the passage the model read. The score is a reason to reread, from a model trained on the public RAID collection of human and AI writing.</p>
+        <p class="footnote">The needle is the suspicious share: lines classified as AI-like, plus lines that were inconclusive. Cyan highlights were classified as AI-like. Purple highlights were inconclusive. The result is an estimate, not a finding.</p>
+      </div>
+
+      <div id="rewrite-body" hidden>
+        <div class="donut-pair">
+          <div id="before-donut" class="donut"></div>
+          <div id="after-donut" class="donut"></div>
+        </div>
+        <p id="pair-blurb" class="donut-blurb"></p>
+        <article id="rewrite" class="essay"></article>
+        <div class="actions">
+          <button id="copy" type="button" class="ghost">Copy</button>
+          <button id="check-rewrite" type="button" class="ghost">Check this rewrite</button>
+        </div>
+        <p class="footnote">Before and after use the same suspicious share as Check for AI. A lower number means less of the rewrite was read as AI-like or inconclusive.</p>
       </div>
     </section>
   </div>
@@ -66,10 +90,10 @@
       <span id="progress-pct">0%</span>
     </div>
     <p id="progress-label">Reviewing the draft</p>
-    <p class="progress-note">Flyleaf is reading the whole draft.</p>
+    <p class="progress-note">Flyleaf is working on this computer.</p>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=14"></script>
 {% endblock %}

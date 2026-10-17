@@ -1,35 +1,79 @@
 {% extends "base.html" %}
-{% block title %}Flyleaf, free writing review{% endblock %}
+{% block title %}Flyleaf, writing review{% endblock %}
 {% block body %}
-<main>
+<main class="home">
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">Portfolio project. Free to use.</p>
-      <h1>The first sheet, before the verdict.</h1>
-      <p class="lede">A flyleaf is the blank page at the front of a book. Flyleaf is that first look at a draft: paste a paragraph, or upload a PDF and download the marked pages. I am Tanui Kipngetich Sila, and anyone can use this for free.</p>
+      <p class="eyebrow">Writing review</p>
+      <h1>A first reading, before a percentage stands in for a decision.</h1>
+      <p class="lede">Flyleaf reviews English prose and shows the share that looks AI-like or inconclusive. Paste a paragraph, or upload a PDF and keep the marked pages. The result is an estimate. It does not establish that a text was written by AI.</p>
       <div class="hero-actions">
-        <a class="button" href="{{ url_for('check') }}">Try our tool</a>
+        <a class="button" href="{{ url_for('check') }}">Check for AI</a>
         <a class="button ghost" href="#method">See how it works</a>
       </div>
+      <ul class="hero-facts">
+        <li>
+          <strong>Free to use</strong>
+          <span>No account and no fee</span>
+        </li>
+        <li>
+          <strong>English prose</strong>
+          <span>A paragraph, a Word file, or a text PDF</span>
+        </li>
+        <li>
+          <strong>A report you can keep</strong>
+          <span>Cover, overview, then the original pages</span>
+        </li>
+      </ul>
     </div>
-    <figure class="hero-photo">
-      <img src="{{ url_for('static', filename='images/hero.jpg') }}" alt="A typewriter and handwritten pages on a wooden desk">
+    <figure class="hero-cover">
+      <img src="{{ url_for('static', filename='images/hero-cover.jpg') }}" alt="Shelves of bound books in a library stack">
     </figure>
   </section>
 
-  <section class="intro" id="name">
-    <img class="intro-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="" width="72" height="72">
-    <div>
-      <p class="eyebrow">The name</p>
-      <h2>A page you meet before the story.</h2>
-      <p>The folded corner in the mark is that flyleaf. The short rust line is a reader's note, the kind someone writes in the margin before they decide what the page means.</p>
-    </div>
+  <section class="offer" aria-label="What Flyleaf does">
+    <article>
+      <p>01</p>
+      <h2>Check for AI</h2>
+      <p>The gauge sits under the draft. The shaded arc fades from green to red as the suspicious share rises.</p>
+    </article>
+    <article>
+      <p>02</p>
+      <h2>PDF review</h2>
+      <p>Upload a text-based PDF. The preview and the download are the same report, with marks on the original lines.</p>
+    </article>
+    <article>
+      <p>03</p>
+      <h2>A plainer draft</h2>
+      <p>Loosen formulaic phrasing on the paste page. The meaning should stay. A later check can still mark the result.</p>
+    </article>
+    <article>
+      <p>04</p>
+      <h2>Highlights you can see</h2>
+      <p>Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive, and those lines stay inside the suspicious share.</p>
+    </article>
   </section>
 
-  <section class="band" id="method">
-    <div class="band-copy">
-      <p class="eyebrow">How it works</p>
-      <h2>Three steps, then the page is yours.</h2>
+  <section class="sample-report" id="pdf-report">
+    <div>
+      <p class="eyebrow">A PDF report</p>
+      <h2>Upload a PDF, and keep the marked pages.</h2>
+      <p>Pasted text stays on the check page. A text-based PDF opens as a report: a cover, an overview, then the original pages. Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive.</p>
+      <a class="button" href="{{ url_for('check') }}">Upload a PDF</a>
+    </div>
+    <figure class="report-sheets">
+      <img src="{{ url_for('static', filename='images/sample-report-cover.png') }}" alt="Sample Flyleaf report cover for a PDF named Sample-draft">
+      <img src="{{ url_for('static', filename='images/sample-report-page.png') }}" alt="Sample report page with cyan and purple highlights on the original text">
+    </figure>
+  </section>
+
+  <section class="method" id="method">
+    <div class="method-inner">
+      <div>
+        <p class="eyebrow">How it works</p>
+        <h2>Three steps from draft to report.</h2>
+        <p class="lede">The same reading appears on the page and in the file you download.</p>
+      </div>
       <ol class="steps">
         <li>
           <span>01</span>
@@ -41,54 +85,32 @@
         <li>
           <span>02</span>
           <div>
-            <h3>Read the highlights</h3>
-            <p>Pasted text opens beside your draft. A PDF opens on its own page, with marks on the original lines.</p>
+            <h3>Read the result</h3>
+            <p>The needle is the suspicious share. The sentence under it says how much was classified as AI-like and how much was inconclusive.</p>
           </div>
         </li>
         <li>
           <span>03</span>
           <div>
-            <h3>Keep the review</h3>
+            <h3>Keep the pages</h3>
             <p>Print or download the report. It opens with a cover and an overview, then every original page.</p>
           </div>
         </li>
       </ol>
     </div>
-    <figure>
-      <img src="{{ url_for('static', filename='images/study.jpg') }}" alt="A person writing in a notebook at a sunlit table">
-    </figure>
-  </section>
-
-  <section class="cards-section" id="ways">
-    <p class="eyebrow">Two ways in</p>
-    <h2>A paragraph beside you, or a PDF you can keep.</h2>
-    <div class="cards">
-      <article class="card">
-        <h3>Pasted text</h3>
-        <p>The draft stays on the left. Highlights, the flagged share, and the likelihood sit on the right, so you can read both at once.</p>
-      </article>
-      <article class="card">
-        <h3>Uploaded PDF</h3>
-        <p>Flyleaf opens the same report you can download: a cover, the percentage, then the original pages with cyan and purple marks.</p>
-      </article>
-      <article class="card">
-        <h3>A file to download</h3>
-        <p>The file and the preview are the same report. Cyan is AI-like. Purple is uncertain. The header and footer stay on every page.</p>
-      </article>
-    </div>
   </section>
 
   <section class="cards-section" id="scores">
     <p class="eyebrow">How to read a score</p>
-    <h2>Three numbers, each with a small job.</h2>
+    <h2>Two shares, and the uncertainty inside them.</h2>
     <div class="cards">
       <article class="card">
-        <h3>Flagged share</h3>
-        <p>How much of the scored writing sits in passages the model marks as AI-like. A mixed draft should not collapse into one color.</p>
+        <h3>Suspicious share</h3>
+        <p>Lines classified as AI-like, plus lines that were inconclusive. That is the number on the gauge, from 0 to 100.</p>
       </article>
       <article class="card">
-        <h3>Likelihood</h3>
-        <p>The average chance across those passages. It is a reading of the draft, useful beside the highlights, not instead of them.</p>
+        <h3>Human-like share</h3>
+        <p>The rest of the scored writing. A mixed draft should not collapse into one color. Read the highlights beside the number.</p>
       </article>
       <article class="card">
         <h3>Confidence</h3>
@@ -99,7 +121,7 @@
 
   <section class="cards-section" id="people">
     <p class="eyebrow">Who it is for</p>
-    <h2>A second pair of eyes, with no login.</h2>
+    <h2>A second reading, with no login.</h2>
     <div class="cards">
       <article class="card">
         <h3>Students</h3>
@@ -118,14 +140,15 @@
 
   <section class="about" id="about">
     <figure>
-      <img src="{{ url_for('static', filename='images/library.jpg') }}" alt="A stack of open books on a table">
+      <img src="{{ url_for('static', filename='images/library.jpg') }}" alt="Curved shelves of books in a library">
     </figure>
     <div>
       <p class="eyebrow">About this site</p>
       <h2>Built as a portfolio, offered for free.</h2>
-      <p>My name is Tanui Kipngetich Sila. Flyleaf is a project I made to show a complete writing-review tool: a public homepage, a checker, and a downloadable PDF report.</p>
+      <p>The name comes from the flyleaf, the blank page at the front of a book. Flyleaf is that first look at a draft.</p>
+      <p>My name is Tanui Kipngetich Sila. I made this to show a complete writing-review tool: a public homepage, a checker, and a downloadable PDF report.</p>
       <p>There is no account and no fee. A percentage is a reason to reread a passage. It does not decide that someone used a chatbot, and it does not grade the work.</p>
-      <a class="button" href="{{ url_for('check') }}">Try our tool</a>
+      <a class="button" href="{{ url_for('check') }}">Check for AI</a>
     </div>
   </section>
 
@@ -135,7 +158,7 @@
       <h2>Bring a paragraph, or a PDF.</h2>
       <p>English text works best. The tool is free, and the review stays on this computer only for as long as Flyleaf is running.</p>
     </div>
-    <a class="button light" href="{{ url_for('check') }}">Try our tool</a>
+    <a class="button light" href="{{ url_for('check') }}">Check for AI</a>
   </section>
 </main>
 {% endblock %}
