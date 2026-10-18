@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Plans, Flyleaf{% endblock %}
+{% block body_class %}app-shell{% endblock %}
+{% block body %}
+<div class="app-frame">
+  {% include "side.html" %}
+  <main class="app-main">
+    <p class="eyebrow">Your account</p>
+    <h1>Plans</h1>
+    <p class="lede">The free plan is the only option right now. More plans will be added later.</p>
+    <div class="plan-grid">
+      <article class="plan-card current">
+        <p class="plan-tag">Current plan</p>
+        <h2>Free</h2>
+        <p class="plan-price">No charge</p>
+        <ul>
+          <li>5 PDF uploads a day</li>
+          <li>A PDF report you can view and download</li>
+          <li>Documents stay with your account on this computer</li>
+        </ul>
+        <p class="plan-usage">{{ uploads_used }} of {{ uploads_limit }} used today. {{ uploads_left }} left.</p>
+      </article>
+      <article class="plan-card later">
+        <p class="plan-tag">Later</p>
+        <h2>More plans</h2>
+        <p>Other plans are not available yet. The free allowance stays at 5 PDF uploads a day until they are.</p>
+      </article>
+    </div>
+  </main>
+</div>
+{% endblock %}

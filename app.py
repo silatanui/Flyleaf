@@ -20,7 +20,7 @@ import time
 import uuid
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, render_template, request, send_file
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import HTTPException
 
 from accounts import current_user, init_accounts, saved_id_for_review
@@ -136,14 +136,24 @@ def home():
     return render_template("home.html")
 
 
+@app.get("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@app.get("/terms")
+def terms():
+    return render_template("terms.html")
+
+
 @app.get("/check")
 def check():
-    return render_template("check.html")
+    return redirect(url_for("home") + "#check")
 
 
 @app.get("/humanize")
 def humanize_page():
-    return render_template("check.html")
+    return redirect(url_for("home") + "#check")
 
 
 @app.get("/review/<review_id>/pages/<int:number>")

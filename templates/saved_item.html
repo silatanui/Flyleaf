@@ -48,7 +48,7 @@
       <form class="actions" method="post" action="{{ url_for('saved_delete', item_id=item.id) }}" onsubmit="return confirm('Delete this saved draft?');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="ghost" type="submit">Delete</button>
-        <a class="button ghost" href="{{ url_for('saved_list') }}">Back to saved work</a>
+        <a class="button ghost" href="{{ url_for('dashboard') }}">Back to documents</a>
       </form>
     </section>
   </div>

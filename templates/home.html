@@ -1,36 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Flyleaf, writing review{% endblock %}
 {% block body %}
+<div class="detect-band">
+<section class="home-lead">
+  <h1><span class="lead-accent">Free draft review</span><br> for the whole piece</h1>
+  <p>Paste English prose or upload a file. Flyleaf marks the share classified as AI-like and keeps inconclusive lines separate. The result is an estimate. It does not establish that a text was written by AI.</p>
+</section>
+{% include "checker.html" %}
+</div>
 <main class="home">
-  <section class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">Writing review</p>
-      <h1>A first reading, before a percentage stands in for a decision.</h1>
-      <p class="lede">Flyleaf reviews English prose and shows the share classified as AI-like. Inconclusive lines stay beside that number. Paste a paragraph, or upload a PDF and keep the marked pages. The result is an estimate. It does not establish that a text was written by AI.</p>
-      <div class="hero-actions">
-        <a class="button" href="{{ url_for('check') }}">Check for AI</a>
-        <a class="button ghost" href="#method">See how it works</a>
-      </div>
-      <ul class="hero-facts">
-        <li>
-          <strong>Free to use</strong>
-          <span>Sign in if you want to keep a draft</span>
-        </li>
-        <li>
-          <strong>English prose</strong>
-          <span>A paragraph, a Word file, or a text PDF</span>
-        </li>
-        <li>
-          <strong>A report you can keep</strong>
-          <span>Cover, overview, then the original pages</span>
-        </li>
-      </ul>
-    </div>
-    <figure class="hero-cover">
-      <img src="{{ url_for('static', filename='images/hero-cover.jpg') }}" alt="Shelves of bound books in a library stack">
-    </figure>
-  </section>
-
   <section class="offer" aria-label="What Flyleaf does">
     <article>
       <p>01</p>
@@ -45,7 +23,7 @@
     <article>
       <p>03</p>
       <h2>A plainer draft</h2>
-      <p>Loosen formulaic phrasing on the paste page. The meaning should stay. A later check can still mark the result.</p>
+      <p>Loosen formulaic phrasing on this page. The meaning should stay. A later check can still mark the result.</p>
     </article>
     <article>
       <p>04</p>
@@ -58,8 +36,8 @@
     <div>
       <p class="eyebrow">A PDF report</p>
       <h2>Upload a PDF, and keep the marked pages.</h2>
-      <p>Pasted text stays on the check page. A text-based PDF opens as a report: a cover, an overview, then the original pages. Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive.</p>
-      <a class="button" href="{{ url_for('check') }}">Upload a PDF</a>
+      <p>Pasted text stays on this page. A text-based PDF opens as a report: a cover, an overview, then the original pages. Sign in to keep that report with your account. Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive.</p>
+      <a class="button" href="#check">Upload a PDF</a>
     </div>
     <figure class="report-sheets">
       <img src="{{ url_for('static', filename='images/sample-report-cover.png') }}" alt="Sample Flyleaf report cover for a PDF named Sample-draft">
@@ -138,6 +116,57 @@
     </div>
   </section>
 
+  <section class="cards-section" id="pricing">
+    <p class="eyebrow">Plans</p>
+    <h2>Free for now.</h2>
+    <p class="lede">One plan is available. More can be added later. The limit is counted in PDF reports kept with an account.</p>
+    <div class="plan-grid home-plans">
+      <article class="plan-card current">
+        <p class="plan-tag">Current plan</p>
+        <h3>Free</h3>
+        <p class="plan-price">No charge</p>
+        <ul>
+          <li>Checks on this page, with no daily cap</li>
+          <li>5 PDF reports kept each day</li>
+          <li>View, download, and delete those reports after you sign in</li>
+        </ul>
+        {% if account %}
+        <a class="button" href="{{ url_for('plans_page') }}">See your usage</a>
+        {% else %}
+        <a class="button" href="{{ url_for('register') }}">Create a free account</a>
+        {% endif %}
+      </article>
+      <article class="plan-card later">
+        <p class="plan-tag">Later</p>
+        <h3>More plans</h3>
+        <p>Other plans are not available yet. The free allowance stays at 5 PDF uploads a day until they are.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="cards-section" id="faq">
+    <p class="eyebrow">Questions</p>
+    <h2>Before a percentage stands in for a decision.</h2>
+    <div class="faq">
+      <details>
+        <summary>Does a high score prove a chatbot wrote the text?</summary>
+        <p>No. The number is the share classified as AI-like by one English model. It is a reason to reread a passage. It is not a finding of misconduct, and it does not grade the work.</p>
+      </details>
+      <details>
+        <summary>What is saved, and what stays on this page?</summary>
+        <p>Pasted text and a rewrite stay in the browser unless you are looking at them now. A PDF that produces a report can be kept with your account after you sign in. You can delete that report from the dashboard.</p>
+      </details>
+      <details>
+        <summary>Where does account data live?</summary>
+        <p>Your name, email, and saved PDF reports are stored on the computer that runs Flyleaf. A password is stored only as a hash. If you use Google, Google confirms the email and Flyleaf keeps the link to that account. See the <a href="{{ url_for('privacy') }}">privacy note</a>.</p>
+      </details>
+      <details>
+        <summary>Will a rewrite hide the AI-like lines?</summary>
+        <p>No. Humanize is a plainer draft for you to review. The meaning should stay. A later check can still mark the result. Flyleaf does not promise a lower score.</p>
+      </details>
+    </div>
+  </section>
+
   <section class="about" id="about">
     <figure>
       <img src="{{ url_for('static', filename='images/library.jpg') }}" alt="Curved shelves of books in a library">
@@ -146,9 +175,9 @@
       <p class="eyebrow">About this site</p>
       <h2>Built as a portfolio, offered for free.</h2>
       <p>The name comes from the flyleaf, the blank page at the front of a book. Flyleaf is that first look at a draft.</p>
-      <p>My name is Tanui Kipngetich Sila. I made this to show a complete writing-review tool: a public homepage, a checker, and a downloadable PDF report.</p>
-      <p>Checking a draft is free. Sign in if you want Flyleaf to keep that draft on this computer. A percentage is a reason to reread a passage. It does not decide that someone used a chatbot, and it does not grade the work.</p>
-      <a class="button" href="{{ url_for('check') }}">Check for AI</a>
+      <p>My name is Tanui Kipngetich Sila. I made this to show a complete writing-review tool: a public homepage, a checker, accounts, and a downloadable PDF report.</p>
+      <p>Checking a draft is free. Sign in if you want Flyleaf to keep a PDF report on this computer. A percentage is a reason to reread a passage. It does not decide that someone used a chatbot, and it does not grade the work.</p>
+      <a class="button" href="#check">Check for AI</a>
     </div>
   </section>
 
@@ -156,9 +185,12 @@
     <div>
       <p class="eyebrow">Open a draft</p>
       <h2>Bring a paragraph, or a PDF.</h2>
-      <p>English text works best. The tool is free. A saved draft stays in the local database. A check you do not save lasts only while Flyleaf is running.</p>
+      <p>English text works best. The tool is free. A kept PDF report stays with your account. A check you do not keep lasts only while Flyleaf is running.</p>
     </div>
-    <a class="button light" href="{{ url_for('check') }}">Check for AI</a>
+    <a class="button light" href="#check">Check for AI</a>
   </section>
 </main>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}?v=32"></script>
 {% endblock %}

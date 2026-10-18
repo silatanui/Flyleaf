@@ -1,0 +1,37 @@
+<aside class="side">
+  <p class="side-usage">{{ uploads_left }} of {{ uploads_limit }} PDF uploads left today</p>
+  <a class="side-link{% if request.endpoint == 'dashboard' %} active{% endif %}" href="{{ url_for('dashboard') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="3.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3.5" y="13.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="13.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    Documents
+  </a>
+  {% if request.endpoint == 'dashboard' and uploads_left > 0 %}
+  <label class="side-link" for="doc-file">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 8 4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    Upload a file
+  </label>
+  {% else %}
+  <a class="side-link{% if uploads_left == 0 %} is-disabled{% endif %}" href="{{ url_for('dashboard') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 8 4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    Upload a file
+  </a>
+  {% endif %}
+  <a class="side-link{% if request.endpoint == 'home' %} active{% endif %}" href="{{ url_for('home') }}#check">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Check for AI
+  </a>
+  <a class="side-link{% if request.endpoint == 'plans_page' %} active{% endif %}" href="{{ url_for('plans_page') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    Plans
+  </a>
+  <a class="side-link{% if request.endpoint == 'account_page' %} active{% endif %}" href="{{ url_for('account_page') }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 19.5c1.4-3 3.6-4.5 6.5-4.5s5.1 1.5 6.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Account
+  </a>
+  <form class="side-foot" method="post" action="{{ url_for('logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="side-link" type="submit">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7V5H19v14H10v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 12H4m0 0 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Sign out
+    </button>
+  </form>
+</aside>

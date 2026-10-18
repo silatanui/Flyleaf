@@ -30,7 +30,7 @@
             <path d="M8 7 L9 19 H15 L16 7"></path>
           </svg>
         </button>
-        <button id="check" type="button" class="with-icon paste-go" disabled>
+        <button id="run-check" type="button" class="with-icon paste-go" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="10" cy="10" r="6"></circle>
             <path d="M14.5 14.5 L20 20"></path>
@@ -100,14 +100,6 @@
           <span class="swatch uncertain">Inconclusive</span>
           <span class="swatch ai">AI-like</span>
         </div>
-        <div class="actions save-row">
-          {% if account %}
-          <button id="save-check" type="button" class="ghost">Save this check</button>
-          {% else %}
-          <a class="button ghost" href="{{ url_for('login', next='/check') }}">Sign in to save this check</a>
-          {% endif %}
-          <span id="save-check-note" class="save-note"></span>
-        </div>
       </div>
     </div>
     <div id="rewrite-score" class="panel score-card" hidden>
@@ -122,12 +114,6 @@
         <div class="actions">
           <button id="copy" type="button" class="ghost">Copy</button>
           <button id="check-rewrite" type="button" class="ghost">Check this rewrite</button>
-          {% if account %}
-          <button id="save-rewrite" type="button" class="ghost">Save this rewrite</button>
-          {% else %}
-          <a class="button ghost" href="{{ url_for('login', next='/check') }}">Sign in to save this rewrite</a>
-          {% endif %}
-          <span id="save-rewrite-note" class="save-note"></span>
         </div>
         <p class="footnote">A lower AI-like number means less of the rewrite was classified as AI-like. The draft still needs a human review.</p>
       </div>
@@ -136,5 +122,5 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/app.js') }}?v=29"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=32"></script>
 {% endblock %}

@@ -1,0 +1,129 @@
+<main class="check-main" id="check">
+  <p id="model-state" class="state">Starting…</p>
+  <div class="mode-dock">
+    <div class="mode-row" role="toolbar" aria-label="What to do with the draft">
+      <button id="mode-check" type="button" class="mode-option is-selected" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4v2M12 16v2M5 11H3M21 11h-2M7 6.5 5.6 5.1M18.4 5.1 17 6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Check for AI
+      </button>
+      <button id="mode-humanize" type="button" class="mode-option" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.5 8 8l3 5 2-3 2 3 1.5-2.2L19 16.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        Humanize
+      </button>
+      <label class="mode-option" id="upload">
+        <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8.5 9 3.5-3.5L15.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 18h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span id="upload-label">Upload</span>
+      </label>
+    </div>
+  </div>
+  <div class="workspace check-layout">
+    <section class="panel write">
+      <div class="pane-top">
+        <p class="pane-kicker">Your draft</p>
+        <div class="sample-row">
+          <button id="sample-human" type="button">Human sample</button>
+          <button id="sample-ai" type="button">AI-style sample</button>
+        </div>
+      </div>
+      <textarea id="draft" rows="14" placeholder="Paste a paragraph or a full essay…"></textarea>
+      <div class="paste-foot">
+        <span id="word-count" class="count">0 words</span>
+        <button id="clear-draft" type="button" class="clear-draft" aria-label="Delete the draft">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7 H19"></path>
+            <path d="M9 7 V5 H15 V7"></path>
+            <path d="M8 7 L9 19 H15 L16 7"></path>
+          </svg>
+        </button>
+        <button id="run-check" type="button" class="with-icon paste-go" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10" cy="10" r="6"></circle>
+            <path d="M14.5 14.5 L20 20"></path>
+          </svg>
+          <span class="btn-label">Check</span>
+        </button>
+        <button id="humanize" type="button" class="with-icon paste-go" hidden disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20 L9 18 L19 8 L15 4 L5 14 Z"></path>
+            <path d="M13 6 L17 10"></path>
+          </svg>
+          <span class="btn-label">Humanize</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="report" class="panel report">
+      <p class="pane-kicker">Reading</p>
+      <div id="report-empty" class="result-sheet">Results will be shown here.</div>
+
+      <div id="progress" class="side-progress" hidden>
+        <p class="side-progress-title">
+          <span class="process-mark" aria-hidden="true"></span>
+          Processing
+        </p>
+        <div class="bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
+          <div id="progress-bar" class="bar-fill"></div>
+        </div>
+        <div class="bar-meta">
+          <span id="progress-label">Reviewing the draft</span>
+          <strong id="progress-pct">0%</strong>
+        </div>
+      </div>
+
+      <div id="report-body" hidden>
+        <div class="highlight-slot result-sheet">
+          <article id="essay" class="essay"></article>
+        </div>
+        <div class="highlight-foot">
+          <button id="offer-humanize" type="button" class="with-icon offer-humanize" hidden disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 L13.6 8.4 L19 10 L13.6 11.6 L12 17 L10.4 11.6 L5 10 L10.4 8.4 Z"></path>
+              <path d="M18 15 L18.7 17.3 L21 18 L18.7 18.7 L18 21 L17.3 18.7 L15 18 L17.3 17.3 Z"></path>
+            </svg>
+            <span class="btn-label">Humanize</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="rewrite-body" hidden>
+        <div class="highlight-slot result-sheet">
+          <article id="rewrite" class="essay"></article>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section id="score-more" class="score-more" hidden>
+    <div id="report-score" class="panel score-card" hidden>
+      <div class="score-slot">
+        <div id="donut" class="donut"></div>
+      </div>
+      <div class="score-copy">
+        <p id="donut-blurb" class="donut-blurb"></p>
+        <ul id="warnings" class="warnings"></ul>
+        <div class="legend">
+          <span class="swatch human">Human-like</span>
+          <span class="swatch uncertain">Inconclusive</span>
+          <span class="swatch ai">AI-like</span>
+        </div>
+      </div>
+    </div>
+    <div id="rewrite-score" class="panel score-card" hidden>
+      <div class="score-slot">
+        <div class="donut-pair">
+          <div id="before-donut" class="donut"></div>
+          <div id="after-donut" class="donut"></div>
+        </div>
+      </div>
+      <div class="score-copy">
+        <p id="pair-blurb" class="donut-blurb"></p>
+        <div class="actions">
+          <button id="copy" type="button" class="ghost">Copy</button>
+          <button id="check-rewrite" type="button" class="ghost">Check this rewrite</button>
+        </div>
+        <p class="footnote">A lower AI-like number means less of the rewrite was classified as AI-like. The draft still needs a human review.</p>
+      </div>
+    </div>
+  </section>
+</main>

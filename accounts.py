@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import timedelta
 from pathlib import Path
 
@@ -16,11 +20,17 @@ from werkzeug.security import check_password_hash, generate_password_hash
 ROOT = Path(__file__).resolve().parent
 REVIEW_DIR = ROOT / "storage" / "reviews"
 DB_NAME = os.environ.get("FLYLEAF_DB_NAME", "flyleaf")
+ADMIN_EMAIL = "silatanuikipngetich@gmail.com"
+FREE_DAILY_UPLOADS = 5
 _READY = False
 _SCHEMA_ERROR = ""
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _REVIEW_ID = re.compile(r"^[a-f0-9]{16,64}$")
+_GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_TOKEN = "https://oauth2.googleapis.com/token"
+_GOOGLE_USERINFO = "https://openidconnect.googleapis.com/v1/userinfo"
+_GOOGLE_CLIENT: dict | None = None
 
 
 def database_error() -> str:
@@ -97,10 +107,28 @@ def ensure_schema() -> None:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """
             )
+            _ensure_google_columns(cur)
     finally:
         conn.close()
     _READY = True
     _SCHEMA_ERROR = ""
+
+
+def _ensure_google_columns(cur) -> None:
+    cur.execute(
+        """
+        SELECT COLUMN_NAME, IS_NULLABLE
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA=%s AND TABLE_NAME='users'
+        """,
+        (DB_NAME,),
+    )
+    columns = {row["COLUMN_NAME"]: row["IS_NULLABLE"] for row in cur.fetchall()}
+    if columns.get("password_hash") == "NO":
+        cur.execute("ALTER TABLE users MODIFY password_hash VARCHAR(255) NULL")
+    if "google_sub" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN google_sub VARCHAR(255) NULL")
+        cur.execute("ALTER TABLE users ADD UNIQUE KEY google_sub (google_sub)")
 
 
 def _cursor():
@@ -111,12 +139,16 @@ def _cursor():
 def _public_user(row: dict | None) -> dict | None:
     if row is None:
         return None
+    email = row["email"]
+    created = row.get("created_at")
     return {
         "id": int(row["id"]),
-        "email": row["email"],
+        "email": email,
         "display_name": row["display_name"],
-        "role": row["role"],
-        "created_at": row["created_at"],
+        "role": "admin" if email.lower() == ADMIN_EMAIL else "member",
+        "has_password": bool(row.get("password_hash")),
+        "created_at": created,
+        "created_label": created.strftime("%d %b %Y") if created else "",
     }
 
 
@@ -133,7 +165,7 @@ def current_user() -> dict | None:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, email, display_name, role, created_at FROM users WHERE id=%s",
+                    "SELECT id, email, password_hash, display_name, role, created_at FROM users WHERE id=%s",
                     (user_id,),
                 )
                 g.account = _public_user(cur.fetchone())
@@ -257,7 +289,10 @@ def authenticate(email: str, password: str) -> dict | None:
             row = cur.fetchone()
     finally:
         conn.close()
-    if row is None or not check_password_hash(row["password_hash"], password or ""):
+    if row is None:
+        return None
+    digest = row.get("password_hash") or ""
+    if not digest or not check_password_hash(digest, password or ""):
         return None
     return _public_user(row)
 
@@ -310,6 +345,109 @@ def seed_admin(email: str, password: str, display_name: str) -> None:
         conn.close()
 
 
+def google_configured() -> bool:
+    return _google_client() is not None
+
+
+def _google_client() -> dict | None:
+    global _GOOGLE_CLIENT
+    if _GOOGLE_CLIENT is not None:
+        return _GOOGLE_CLIENT or None
+    client_id = os.environ.get("FLYLEAF_GOOGLE_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("FLYLEAF_GOOGLE_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        path = ROOT / "storage" / "google_client.json"
+        try:
+            saved = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            saved = {}
+        client_id = str(saved.get("client_id") or "").strip()
+        client_secret = str(saved.get("client_secret") or "").strip()
+    if not client_id or not client_secret:
+        _GOOGLE_CLIENT = {}
+        return None
+    _GOOGLE_CLIENT = {"client_id": client_id, "client_secret": client_secret}
+    return _GOOGLE_CLIENT
+
+
+def login_google(email: str, name: str, subject: str) -> dict:
+    cleaned = _clean_email(email)
+    google_sub = (subject or "").strip()
+    if not google_sub or len(google_sub) > 255:
+        raise ValueError("Google did not confirm that account.")
+    display = _clean_name(name, cleaned)
+    conn = _cursor()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, email, display_name, role, created_at FROM users WHERE google_sub=%s",
+                (google_sub,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                cur.execute(
+                    "SELECT id, email, display_name, role, created_at, google_sub FROM users WHERE email=%s",
+                    (cleaned,),
+                )
+                row = cur.fetchone()
+                if row:
+                    if row.get("google_sub") and row["google_sub"] != google_sub:
+                        raise ValueError("That email is already linked to a different Google account.")
+                    cur.execute("UPDATE users SET google_sub=%s WHERE id=%s", (google_sub, row["id"]))
+                else:
+                    cur.execute(
+                        "INSERT INTO users (email, password_hash, display_name, role, google_sub) VALUES (%s, NULL, %s, 'member', %s)",
+                        (cleaned, display, google_sub),
+                    )
+                    return {
+                        "id": int(cur.lastrowid),
+                        "email": cleaned,
+                        "display_name": display,
+                        "role": "member",
+                    }
+    except IntegrityError as exc:
+        raise ValueError("An account with that email already exists. Log in instead.") from exc
+    finally:
+        conn.close()
+    return _public_user(row)
+
+
+def _google_identity(code: str, redirect_uri: str) -> dict:
+    client = _google_client()
+    if client is None:
+        raise ValueError("Google sign-in is not configured.")
+    body = urllib.parse.urlencode(
+        {
+            "code": code,
+            "client_id": client["client_id"],
+            "client_secret": client["client_secret"],
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }
+    ).encode()
+    token_request = urllib.request.Request(_GOOGLE_TOKEN, data=body, method="POST")
+    try:
+        with urllib.request.urlopen(token_request, timeout=20) as response:
+            token = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise ValueError("Google sign-in did not finish. Try again.") from exc
+    access = str(token.get("access_token") or "")
+    if not access:
+        raise ValueError("Google sign-in did not finish. Try again.")
+    info_request = urllib.request.Request(
+        _GOOGLE_USERINFO,
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    try:
+        with urllib.request.urlopen(info_request, timeout=20) as response:
+            profile = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise ValueError("Google did not share an email address.") from exc
+    if profile.get("email_verified") is False:
+        raise ValueError("That Google email is not verified.")
+    return profile
+
+
 def _sign_in(user: dict) -> None:
     session.clear()
     session.permanent = True
@@ -321,27 +459,56 @@ def _safe_next(value: str | None) -> str:
     target = value or ""
     if target.startswith("/") and not target.startswith("//") and not re.search(r"[\s\\]", target):
         return target
-    return url_for("saved_list")
+    return url_for("dashboard")
 
 
-def list_saved(user_id: int) -> list[dict]:
+def list_saved(user_id: int, kind: str | None = None) -> list[dict]:
+    conn = _cursor()
+    try:
+        with conn.cursor() as cur:
+            sql = """
+                SELECT id, title, kind, flagged_percent, uncertain_percent, review_key, created_at
+                FROM saved_work
+                WHERE user_id=%s
+            """
+            params: list = [user_id]
+            if kind:
+                sql += " AND kind=%s"
+                params.append(kind)
+            sql += " ORDER BY created_at DESC, id DESC LIMIT 500"
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return [_saved_summary(row) for row in rows]
+
+
+def uploads_today(user_id: int) -> int:
     conn = _cursor()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, title, kind, flagged_percent, uncertain_percent, created_at
+                SELECT COUNT(*) AS total
                 FROM saved_work
-                WHERE user_id=%s
-                ORDER BY id DESC
-                LIMIT 100
+                WHERE user_id=%s AND kind='pdf' AND created_at >= CURDATE()
                 """,
                 (user_id,),
             )
-            rows = cur.fetchall()
+            row = cur.fetchone()
     finally:
         conn.close()
-    return [_saved_summary(row) for row in rows]
+    return int(row["total"]) if row else 0
+
+
+def _usage(user_id: int) -> dict:
+    used = uploads_today(user_id)
+    left = max(0, FREE_DAILY_UPLOADS - used)
+    return {
+        "uploads_used": used,
+        "uploads_left": left,
+        "uploads_limit": FREE_DAILY_UPLOADS,
+    }
 
 
 def _saved_summary(row: dict) -> dict:
@@ -353,7 +520,9 @@ def _saved_summary(row: dict) -> dict:
         "kind_label": {"check": "Check", "rewrite": "Rewrite", "pdf": "PDF report"}.get(row["kind"], "Saved"),
         "flagged_percent": row["flagged_percent"],
         "uncertain_percent": row["uncertain_percent"],
-        "created_label": created.strftime("%d %b %Y, %H:%M") if created else "",
+        "review_key": row.get("review_key") or "",
+        "created_label": created.strftime("%d %b %Y, %I:%M %p") if created else "",
+        "created_order": created.strftime("%Y-%m-%d %H:%M:%S") if created else "",
     }
 
 
@@ -453,6 +622,85 @@ def insert_saved(user_id: int, title: str, kind: str, source: str, result: dict,
         conn.close()
 
 
+def _file_title(name: str) -> str:
+    base = Path(str(name or "")).name.replace("\x00", "").strip()
+    base = re.sub(r"[^\w .\-()]+", "", base, flags=re.UNICODE).strip(" .")
+    return (base or "draft")[:160]
+
+
+def keep_document(user_id: int, filename: str, result: dict, review_id: str) -> int:
+    del result
+    title = _file_title(filename)
+    if not title.lower().endswith(".pdf"):
+        raise ValueError("Upload a PDF. Flyleaf keeps a report for PDF files.")
+    if not review_id or not _REVIEW_ID.fullmatch(review_id):
+        raise ValueError("That file did not produce a PDF report.")
+    existing = saved_id_for_review(user_id, review_id)
+    if existing:
+        return existing
+    if uploads_today(user_id) >= FREE_DAILY_UPLOADS:
+        raise ValueError("The free plan includes 5 PDF uploads a day. Try again tomorrow.")
+    meta = REVIEW_DIR / f"{review_id}.json"
+    pdf = REVIEW_DIR / f"{review_id}.pdf"
+    if not meta.is_file() or not pdf.is_file():
+        raise ValueError("That report is no longer on this computer.")
+    summary = json.loads(meta.read_text(encoding="utf-8"))
+    stored = {
+        "filename": title,
+        "flagged_percent": _percent(summary.get("flagged_percent")) or 0,
+        "uncertain_percent": _percent(summary.get("uncertain_percent")) or 0,
+        "confidence": summary.get("confidence") or "",
+        "word_count": _word_count(summary.get("word_count")),
+        "page_count": int(summary.get("page_count") or 0),
+        "review_id": review_id,
+    }
+    return insert_saved(
+        user_id,
+        str(summary.get("filename") or title)[:160],
+        "pdf",
+        title,
+        stored,
+        review_id,
+        stored["flagged_percent"],
+        stored["uncertain_percent"],
+    )
+
+
+def update_profile(user_id: int, name: str, email: str, current_password: str, new_password: str) -> None:
+    cleaned = _clean_email(email)
+    display = _clean_name(name, cleaned)
+    new_password = new_password or ""
+    conn = _cursor()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, email, password_hash FROM users WHERE id=%s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise ValueError("That account is no longer available.")
+            if cleaned != (row["email"] or "").lower():
+                cur.execute("SELECT id FROM users WHERE email=%s", (cleaned,))
+                taken = cur.fetchone()
+                if taken and int(taken["id"]) != int(user_id):
+                    raise ValueError("An account with that email already exists.")
+            digest = row.get("password_hash") or ""
+            if new_password:
+                if len(new_password) < 8:
+                    raise ValueError("Use at least 8 characters.")
+                if digest and not check_password_hash(digest, current_password or ""):
+                    raise ValueError("The current password does not match.")
+                digest = generate_password_hash(new_password)
+            role = "admin" if cleaned == ADMIN_EMAIL else "member"
+            cur.execute(
+                "UPDATE users SET email=%s, display_name=%s, password_hash=%s, role=%s WHERE id=%s",
+                (cleaned, display, digest or None, role, user_id),
+            )
+    finally:
+        conn.close()
+
+
 def list_users() -> list[dict]:
     conn = _cursor()
     try:
@@ -514,7 +762,7 @@ def init_accounts(app) -> None:
 
     @app.context_processor
     def inject_account():
-        return {"account": current_user(), "csrf_token": csrf_token()}
+        return {"account": current_user(), "csrf_token": csrf_token(), "google_ready": google_configured()}
 
     @app.get("/login")
     def login():
@@ -569,6 +817,54 @@ def init_accounts(app) -> None:
         _sign_in(user)
         return redirect(url_for("saved_list"))
 
+    @app.get("/auth/google")
+    def google_start():
+        if not google_configured():
+            return _db_page("auth.html", mode="login", error="Google sign-in is not configured on this computer.", next_url="")
+        state = secrets.token_urlsafe(24)
+        session["google_state"] = state
+        session["google_next"] = _safe_next(request.args.get("next"))
+        query = urllib.parse.urlencode(
+            {
+                "client_id": _google_client()["client_id"],
+                "redirect_uri": url_for("google_callback", _external=True),
+                "response_type": "code",
+                "scope": "openid email profile",
+                "state": state,
+                "prompt": "select_account",
+            }
+        )
+        return redirect(f"{_GOOGLE_AUTH}?{query}")
+
+    @app.get("/auth/google/callback")
+    def google_callback():
+        expected = session.get("google_state") or ""
+        sent = request.args.get("state") or ""
+        nxt = session.get("google_next") or ""
+        if request.args.get("error"):
+            return render_template(
+                "auth.html",
+                mode="login",
+                error="Google sign-in was cancelled.",
+                next_url=_safe_next(nxt),
+            )
+        if not expected or not sent or not secrets.compare_digest(sent, expected):
+            return render_template(
+                "auth.html",
+                mode="login",
+                error="Google sign-in expired. Try again.",
+                next_url=_safe_next(nxt),
+            )
+        try:
+            profile = _google_identity(request.args.get("code") or "", url_for("google_callback", _external=True))
+            user = login_google(profile.get("email") or "", profile.get("name") or "", profile.get("sub") or "")
+        except ValueError as exc:
+            return render_template("auth.html", mode="login", error=str(exc), next_url=_safe_next(nxt))
+        except OperationalError:
+            return render_template("auth.html", mode="offline", error=database_error()), 503
+        _sign_in(user)
+        return redirect(_safe_next(nxt))
+
     @app.post("/logout")
     def logout():
         if not _csrf_ok():
@@ -576,16 +872,79 @@ def init_accounts(app) -> None:
         session.clear()
         return redirect(url_for("home"))
 
+    @app.get("/dashboard")
+    def dashboard():
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next="/dashboard"))
+        try:
+            items = list_saved(user["id"], "pdf")
+            usage = _usage(user["id"])
+        except OperationalError:
+            return render_template("auth.html", mode="offline", error=database_error()), 503
+        return render_template("dashboard.html", items=items, **usage)
+
+    @app.get("/plans")
+    def plans_page():
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next="/plans"))
+        try:
+            usage = _usage(user["id"])
+        except OperationalError:
+            return render_template("auth.html", mode="offline", error=database_error()), 503
+        return render_template("plans.html", **usage)
+
+    @app.get("/account")
+    def account_page():
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next="/account"))
+        try:
+            usage = _usage(user["id"])
+        except OperationalError:
+            return render_template("auth.html", mode="offline", error=database_error()), 503
+        return render_template("account.html", error="", **usage)
+
+    @app.post("/account")
+    def account_post():
+        if not _csrf_ok():
+            abort(400)
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next="/account"))
+        new_password = request.form.get("new_password") or ""
+        confirm = request.form.get("confirm_password") or ""
+        try:
+            if new_password or confirm:
+                if new_password != confirm:
+                    raise ValueError("Those passwords do not match.")
+            update_profile(
+                user["id"],
+                request.form.get("name") or "",
+                request.form.get("email") or "",
+                request.form.get("current_password") or "",
+                new_password,
+            )
+        except ValueError as exc:
+            try:
+                usage = _usage(user["id"])
+            except OperationalError:
+                return render_template("auth.html", mode="offline", error=database_error()), 503
+            return render_template("account.html", error=str(exc), **usage)
+        except OperationalError:
+            return render_template("auth.html", mode="offline", error=database_error()), 503
+        if hasattr(g, "account"):
+            del g.account
+        flash("Your account was updated.")
+        return redirect(url_for("account_page"))
+
     @app.get("/saved")
     def saved_list():
         user = current_user()
         if user is None:
-            return redirect(url_for("login", next="/saved"))
-        try:
-            items = list_saved(user["id"])
-        except OperationalError:
-            return render_template("auth.html", mode="offline", error=database_error()), 503
-        return render_template("saved.html", heading="Saved work", owner=user, items=items, admin_view=False)
+            return redirect(url_for("login", next="/dashboard"))
+        return redirect(url_for("dashboard"))
 
     @app.get("/saved/<int:item_id>")
     def saved_item(item_id: int):
@@ -618,8 +977,8 @@ def init_accounts(app) -> None:
             return redirect(url_for("saved_list"))
         if not removed:
             abort(404)
-        flash("That draft was removed.")
-        return redirect(url_for("saved_list"))
+        flash("That document was removed.")
+        return redirect(_safe_next(request.form.get("next") or "/dashboard"))
 
     @app.post("/api/saved")
     def save_api():
@@ -632,6 +991,8 @@ def init_accounts(app) -> None:
         kind = payload.get("kind")
         source = str(payload.get("source_text") or "").replace("\x00", "").strip()
         result = payload.get("result") if isinstance(payload.get("result"), dict) else None
+        if kind in {"check", "rewrite"}:
+            return jsonify({"error": "Pasted text stays on the checker. Upload a PDF to keep a report."}), 400
         if kind not in {"check", "rewrite"} or result is None or not source:
             return jsonify({"error": "There is nothing to save yet."}), 400
         if len(source) > 200_000:
@@ -651,6 +1012,47 @@ def init_accounts(app) -> None:
         except OperationalError:
             return jsonify({"error": database_error()}), 503
         return jsonify({"id": item_id, "url": url_for("saved_item", item_id=item_id)})
+
+    @app.post("/api/documents")
+    def save_document_api():
+        user = current_user()
+        if user is None:
+            return jsonify({"error": "Sign in to keep a document."}), 401
+        if not _csrf_ok():
+            return jsonify({"error": "The page expired. Reload it and try again."}), 400
+        payload = request.get_json(silent=True) or {}
+        result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+        filename = _file_title(str(payload.get("filename") or result.get("filename") or "draft"))
+        review_id = str(payload.get("review_id") or result.get("review_id") or "")
+        try:
+            item_id = keep_document(user["id"], filename, result, review_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except OperationalError:
+            return jsonify({"error": database_error()}), 503
+        return jsonify({"id": item_id, "url": url_for("dashboard")})
+
+    @app.get("/saved/<int:item_id>/download")
+    def saved_download(item_id: int):
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next="/dashboard"))
+        try:
+            item = get_saved(item_id, user)
+        except OperationalError:
+            return render_template("auth.html", mode="offline", error=database_error()), 503
+        if item is None:
+            abort(404)
+        if item.get("review_key"):
+            return redirect(url_for("review_download", review_id=item["review_key"]))
+        name = _file_title(item["title"]).replace('"', "")
+        if "." not in name:
+            name = f"{name}.txt"
+        return app.response_class(
+            item["source_text"],
+            mimetype="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
 
     @app.post("/review/<review_id>/save")
     def save_review(review_id: str):

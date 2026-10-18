@@ -2,7 +2,7 @@ const draft = document.querySelector("#draft");
 const fileInput = document.querySelector("#file");
 const uploadLabel = document.querySelector("#upload-label");
 const wordCount = document.querySelector("#word-count");
-const checkButton = document.querySelector("#check");
+const checkButton = document.querySelector("#run-check");
 const humanizeButton = document.querySelector("#humanize");
 const offerHumanize = document.querySelector("#offer-humanize");
 const HIGH_AI = 50;
@@ -72,6 +72,7 @@ function refreshCount() {
   const count = words(draft.value);
   wordCount.textContent = `${count} word${count === 1 ? "" : "s"}`;
   draft.classList.toggle("has-prose", Boolean(draft.value.trim()));
+  if (typeof buttonsAvailable === "function") buttonsAvailable();
 }
 
 function selectedPdf() {
@@ -401,6 +402,18 @@ function sourceFor(result) {
   return (result.sentences || []).map((item) => item.text).join(" ");
 }
 
+async function keepUpload(filename, result) {
+  if (!result || !result.review_id) return;
+  const token = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+  const response = await fetch(appPath("/api/documents"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
+    body: JSON.stringify({ filename, review_id: result.review_id, result }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "That PDF could not be kept.");
+}
+
 async function storeWork(button, note, kind, source, result) {
   button.disabled = true;
   if (note) note.textContent = "Saving...";
@@ -447,8 +460,13 @@ function clearBusyLabel(button) {
 }
 
 function buttonsAvailable() {
-  checkButton.disabled = !detectorReady;
-  humanizeButton.disabled = !humanizerReady;
+  const busy = (checkButton && checkButton.classList.contains("is-busy"))
+    || (humanizeButton && humanizeButton.classList.contains("is-busy"));
+  if (busy) return;
+  const count = draft ? words(draft.value) : 0;
+  const hasFile = Boolean(fileInput && fileInput.files && fileInput.files.length > 0);
+  if (checkButton) checkButton.disabled = !detectorReady || (count < 20 && !hasFile);
+  if (humanizeButton) humanizeButton.disabled = !humanizerReady || count < 8;
   if (offerHumanize) offerHumanize.disabled = !humanizerReady;
 }
 
@@ -590,12 +608,23 @@ checkButton.addEventListener("click", () => {
     const form = new FormData();
     form.append("file", fileInput.files[0]);
     runJob(appPath("/api/analyze"), form, true, "Reviewing the draft", "Opening the review", (result) => {
-      if (result.review_url) {
-        const opened = window.open(appPath(result.review_url), "_blank");
-        if (!opened) window.location = appPath(result.review_url);
+      const chosen = fileInput.files[0];
+      const openReview = () => {
+        if (result.review_url) {
+          const opened = window.open(appPath(result.review_url), "_blank");
+          if (!opened) window.location = appPath(result.review_url);
+          return;
+        }
+        showReport(result);
+      };
+      if (chosen && result.review_id && document.body.dataset.signedIn === "1") {
+        keepUpload(chosen.name, result).then(openReview).catch((error) => {
+          window.alert(error.message);
+          openReview();
+        });
         return;
       }
-      showReport(result);
+      openReview();
     }, checkButton);
     return;
   }
@@ -678,6 +707,7 @@ fileInput.addEventListener("change", async () => {
   wordCount.textContent = file.name.toLowerCase().endsWith(".pdf")
     ? "Opens a reviewed PDF"
     : "Score will use the uploaded file";
+  buttonsAvailable();
 });
 
 ["dragenter", "dragover"].forEach((name) => {

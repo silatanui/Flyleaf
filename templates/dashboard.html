@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Documents, Flyleaf{% endblock %}
+{% block body_class %}app-shell{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/dataTables.dataTables.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=2">
+{% endblock %}
+{% block body %}
+<div class="app-frame">
+  {% include "side.html" %}
+  <main class="app-main">
+    <div class="app-head">
+      <div>
+        <p class="eyebrow">Your documents</p>
+        <h1>Documents</h1>
+        <p>Upload a PDF. Flyleaf keeps the report here, newest first. Pasted text stays on the checker.</p>
+      </div>
+      {% if uploads_left > 0 %}
+      <label class="button app-upload" for="doc-file">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 8 4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        Upload a file
+      </label>
+      <input id="doc-file" type="file" accept=".pdf,application/pdf">
+      {% else %}
+      <p class="limit-note">You have used today's 5 free PDF uploads.</p>
+      {% endif %}
+    </div>
+    <p id="doc-note" class="doc-note" role="status"></p>
+    <div class="table-card">
+      <table id="documents" class="display">
+        <thead>
+          <tr>
+            <th>File name</th>
+            <th>Uploaded</th>
+            <th>AI-like</th>
+            <th data-dt-order="disable">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          {% if item.review_key %}
+          <tr>
+            <td class="doc-name">{{ item.title }}</td>
+            <td data-order="{{ item.created_order }}">{{ item.created_label }}</td>
+            <td data-order="{{ item.flagged_percent if item.flagged_percent is not none else 0 }}">{{ item.flagged_percent if item.flagged_percent is not none else 0 }}%</td>
+            <td>
+              <div class="doc-actions">
+                <a class="icon-btn view" href="{{ url_for('review', review_id=item.review_key) }}" title="View results">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6.5 6 12 6s9.5 6 9.5 6-4 6-9.5 6S2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+                  View
+                </a>
+                <a class="icon-btn" href="{{ url_for('review_download', review_id=item.review_key) }}" title="Download">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 11 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  Download
+                </a>
+                <form method="post" action="{{ url_for('saved_delete', item_id=item.id) }}" onsubmit="return confirm('Remove this document?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="next" value="/dashboard">
+                  <button class="icon-btn delete" type="submit" title="Delete">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 7V5h6v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 7l1 12h6l1-12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/datatables/jquery-3.7.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/datatables/dataTables.min.js') }}"></script>
+<script>
+const docFile = document.querySelector("#doc-file");
+const docNote = document.querySelector("#doc-note");
+const analyzeUrl = {{ url_for("analyze")|tojson }};
+const documentsUrl = {{ url_for("save_document_api")|tojson }};
+const dashboardUrl = {{ url_for("dashboard")|tojson }};
+
+new DataTable("#documents", {
+  order: [[1, "desc"]],
+  pageLength: 10,
+  autoWidth: false,
+  columnDefs: [{ orderable: false, targets: 3 }],
+  language: {
+    emptyTable: "No documents yet. Upload a PDF to keep the report here.",
+    search: "Search:",
+    lengthMenu: "Show _MENU_",
+    info: "Showing _START_ to _END_ of _TOTAL_",
+    infoEmpty: "No documents",
+    zeroRecords: "No documents match that search."
+  }
+});
+
+async function readJson(response) {
+  const text = await response.text();
+  return JSON.parse(text);
+}
+
+async function readJob(url) {
+  const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) return null;
+  return JSON.parse(await response.text());
+}
+
+if (docFile) {
+  docFile.addEventListener("change", async () => {
+    const file = docFile.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      docNote.textContent = "Upload a PDF. Flyleaf keeps a report for PDF files.";
+      docFile.value = "";
+      return;
+    }
+    docFile.disabled = true;
+    docNote.textContent = "Reviewing the file…";
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const started = await fetch(analyzeUrl, { method: "POST", body });
+      const payload = await readJson(started);
+      if (!started.ok) throw new Error(payload.error || "The file could not be reviewed.");
+      let result = payload.result;
+      if (!result) {
+        const watch = payload.watch_url || "";
+        const jobsRoot = analyzeUrl.replace(/\/analyze$/, "/jobs/");
+        for (;;) {
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          const job = (watch && await readJob(watch)) || await readJob(`${jobsRoot}${payload.job_id}`);
+          if (!job) continue;
+          if (typeof job.percent === "number") docNote.textContent = `Reviewing the file… ${job.percent}%`;
+          if (job.status === "done") {
+            result = job.result;
+            break;
+          }
+          if (job.status === "error") throw new Error(job.error || "The review could not be finished.");
+        }
+      }
+      if (!result || !result.review_id) throw new Error("That file did not produce a PDF report.");
+      const token = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+      const saved = await fetch(documentsUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
+        body: JSON.stringify({ filename: file.name, review_id: result.review_id, result }),
+      });
+      const kept = await readJson(saved);
+      if (!saved.ok) throw new Error(kept.error || "Could not keep that file.");
+      window.location = dashboardUrl;
+    } catch (error) {
+      docNote.textContent = error.message;
+      docFile.disabled = false;
+      docFile.value = "";
+    }
+  });
+}
+</script>
+{% endblock %}

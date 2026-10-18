@@ -1,0 +1,57 @@
+.dt-container {
+  color: #1c2430;
+  font-family: "Outfit", sans-serif;
+}
+
+.dt-container .dt-search,
+.dt-container .dt-length {
+  margin: 12px 0;
+}
+
+.dt-container .dt-input {
+  border: 1px solid #dde3e8;
+  border-radius: 0;
+  padding: 8px 10px;
+  background: #fff;
+  color: #1c2430;
+  font: inherit;
+}
+
+div.dt-container table.dataTable {
+  width: 100% !important;
+  border-collapse: collapse;
+}
+
+div.dt-container table.dataTable thead th {
+  padding: 12px 10px;
+  border-bottom: 1px solid #dde3e8;
+  color: #5c6b78;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+div.dt-container table.dataTable tbody td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #dde3e8;
+  vertical-align: middle;
+}
+
+div.dt-container table.dataTable td.dt-empty {
+  text-align: left;
+}
+
+div.dt-container table.dataTable tbody tr:hover {
+  background: #f7fafc;
+}
+
+.dt-paging .dt-paging-button {
+  border-radius: 0 !important;
+}
+
+.dt-paging .dt-paging-button.current {
+  background: #0057b8 !important;
+  border-color: #0057b8 !important;
+  color: #fff !important;
+}

@@ -12,6 +12,13 @@
     <h1>Create an account</h1>
     <p>Saving a draft keeps it in the database on this computer. Checking a draft stays free either way.</p>
     {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+    {% if google_ready %}
+    <a class="google-btn" href="{{ url_for('google_start') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.5z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.4 1.2-3.9 1.2-3 0-5.6-2-6.5-4.8H1.7v3c1.9 3.8 5.8 6.3 10.3 6.3z"/><path fill="#FBBC05" d="M5.5 14.7a7.2 7.2 0 0 1 0-4.6V7.1H1.7a12 12 0 0 0 0 10.8l3.8-3.2z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.1 15.1 0 12 0 7.5 0 3.6 2.5 1.7 6.3l3.8 3c.9-2.8 3.5-4.5 6.5-4.5z"/></svg>
+      Continue with Google
+    </a>
+    <p class="auth-or">or use email</p>
+    {% endif %}
     <form method="post" action="{{ url_for('register_post') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Name
@@ -34,6 +41,13 @@
     <h1>Log in</h1>
     <p>Sign in to save a check, a rewrite, or a PDF report on this computer.</p>
     {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+    {% if google_ready %}
+    <a class="google-btn" href="{{ url_for('google_start', next=next_url or '') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.5z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.4 1.2-3.9 1.2-3 0-5.6-2-6.5-4.8H1.7v3c1.9 3.8 5.8 6.3 10.3 6.3z"/><path fill="#FBBC05" d="M5.5 14.7a7.2 7.2 0 0 1 0-4.6V7.1H1.7a12 12 0 0 0 0 10.8l3.8-3.2z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.1 15.1 0 12 0 7.5 0 3.6 2.5 1.7 6.3l3.8 3c.9-2.8 3.5-4.5 6.5-4.5z"/></svg>
+      Continue with Google
+    </a>
+    <p class="auth-or">or use email</p>
+    {% endif %}
     <form method="post" action="{{ url_for('login_post') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="next" value="{{ next_url or '' }}">
