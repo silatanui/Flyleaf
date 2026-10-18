@@ -34,15 +34,29 @@ _GOOGLE_CLIENT: dict | None = None
 
 
 def database_error() -> str:
-    return _SCHEMA_ERROR or "Flyleaf could not reach the local database. Start MySQL in XAMPP and try again."
+    if _SCHEMA_ERROR:
+        return _SCHEMA_ERROR
+    if os.environ.get("FLYLEAF_DB_USER") or os.environ.get("FLYLEAF_DB_HOST"):
+        return "Flyleaf could not open its database. Check the database name, user, and password for this server."
+    return "Flyleaf could not reach the local database. Start MySQL in XAMPP and try again."
+
+
+def _socket_path(host: str) -> str:
+    chosen = os.environ.get("FLYLEAF_DB_SOCKET", "").strip()
+    if chosen:
+        return chosen
+    if host != "localhost":
+        return ""
+    for candidate in ("/var/lib/mysql/mysql.sock", "/tmp/mysql.sock", "/var/run/mysqld/mysqld.sock"):
+        if os.path.exists(candidate):
+            return candidate
+    return ""
 
 
 def _settings(with_database: bool) -> dict:
     if not re.fullmatch(r"[A-Za-z0-9_]+", DB_NAME):
         raise RuntimeError("The database name is not valid.")
-    return {
-        "host": os.environ.get("FLYLEAF_DB_HOST", "127.0.0.1"),
-        "port": int(os.environ.get("FLYLEAF_DB_PORT", "3306")),
+    settings = {
         "user": os.environ.get("FLYLEAF_DB_USER", "root"),
         "password": os.environ.get("FLYLEAF_DB_PASSWORD", ""),
         "database": DB_NAME if with_database else None,
@@ -50,6 +64,14 @@ def _settings(with_database: bool) -> dict:
         "autocommit": True,
         "cursorclass": pymysql.cursors.DictCursor,
     }
+    host = os.environ.get("FLYLEAF_DB_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    socket_path = _socket_path(host)
+    if socket_path:
+        settings["unix_socket"] = socket_path
+    else:
+        settings["host"] = host
+        settings["port"] = int(os.environ.get("FLYLEAF_DB_PORT", "3306"))
+    return settings
 
 
 def _connect(with_database: bool = True):
@@ -60,15 +82,22 @@ def ensure_schema() -> None:
     global _READY, _SCHEMA_ERROR
     if _READY:
         return
-    bare = _connect(with_database=False)
+    # A hosting account cannot create a database. Use the one assigned in cPanel.
     try:
-        with bare.cursor() as cur:
-            cur.execute(
-                f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}` "
-                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            )
-    finally:
-        bare.close()
+        bare = _connect(with_database=False)
+    except OperationalError:
+        bare = None
+    if bare is not None:
+        try:
+            with bare.cursor() as cur:
+                cur.execute(
+                    f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}` "
+                    "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                )
+        except OperationalError:
+            pass
+        finally:
+            bare.close()
 
     conn = _connect()
     try:
