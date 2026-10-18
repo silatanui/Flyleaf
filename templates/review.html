@@ -4,7 +4,7 @@
 <div class="review-bar">
   <div class="review-bar-inner">
     <p class="review-file">{{ summary.filename }}</p>
-    <p class="review-score">{{ summary.detected_percent }}% detected as AI</p>
+    <p class="review-score">{{ summary.flagged_percent }}% AI-like · {{ summary.uncertain_percent }}% inconclusive</p>
     <a class="button ghost" href="{{ url_for('review_download', review_id=review_id) }}">Download</a>
     <button type="button" class="button" id="print-review">Print</button>
   </div>

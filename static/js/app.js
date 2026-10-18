@@ -104,12 +104,12 @@ function gaugeArc(cx, cy, radius, start, end) {
 }
 
 function explainReading(reading) {
-  const { ai, uncertain, suspicious } = reading;
-  let detail = "The draft was read as human-like.";
-  if (suspicious > 0 && uncertain === 0) detail = `${ai}% was classified as AI-like.`;
-  if (suspicious > 0 && ai === 0) detail = `None of it was classified as clearly AI-like. ${uncertain}% was inconclusive.`;
-  if (ai > 0 && uncertain > 0) detail = `${ai}% was classified as AI-like, while ${uncertain}% was inconclusive.`;
-  return `${suspicious}% AI-like or suspicious content. ${detail} The result is an estimate and does not establish whether the text was written by AI.`;
+  const { ai, uncertain } = reading;
+  let lead = "The draft was read as human-like.";
+  if (ai > 0 && uncertain === 0) lead = `${ai}% was classified as AI-like.`;
+  if (ai === 0 && uncertain > 0) lead = `None of it was classified as clearly AI-like. ${uncertain}% was inconclusive.`;
+  if (ai > 0 && uncertain > 0) lead = `${ai}% was classified as AI-like. ${uncertain}% was inconclusive.`;
+  return `${lead} The result is an estimate and does not establish whether the text was written by AI.`;
 }
 
 let gaugeSerial = 0;
@@ -119,7 +119,7 @@ function drawGauge(host, reading, caption) {
   const cy = 168;
   const radius = 112;
   const width = 28;
-  const value = Math.max(0, Math.min(100, reading.suspicious));
+  const value = Math.max(0, Math.min(100, reading.ai));
   const color = speedColor(value);
   const start = Math.PI;
   const end = Math.PI + Math.PI * (value / 100);
@@ -136,7 +136,7 @@ function drawGauge(host, reading, caption) {
   }).join("");
   const [sx, sy] = gaugePoint(cx, cy, 18, end);
   const [nx, ny] = gaugePoint(cx, cy, radius - width / 2 - 8, end);
-  host.innerHTML = `<svg viewBox="0 0 480 300" role="img" aria-label="${value}% AI-like or suspicious">
+  host.innerHTML = `<svg viewBox="0 0 480 300" role="img" aria-label="${value}% AI-like, ${reading.uncertain}% inconclusive">
     <defs>
       <linearGradient id="${gradientId}" x1="${leftX}" y1="${cy}" x2="${rightX}" y2="${cy}" gradientUnits="userSpaceOnUse">
         <stop offset="0%" stop-color="#1f9d57"></stop>
@@ -157,14 +157,14 @@ function drawGauge(host, reading, caption) {
     <text x="${cx + radius}" y="${cy + 22}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="13" fill="#5c6b7a">100</text>
     <text x="120" y="268" text-anchor="middle" font-family="Outfit, sans-serif" font-size="22" font-weight="650" fill="#172033">${reading.human}%</text>
     <text x="120" y="288" text-anchor="middle" font-family="Outfit, sans-serif" font-size="12" fill="#5c6b7a">Human-like</text>
-    <text x="360" y="268" text-anchor="middle" font-family="Outfit, sans-serif" font-size="22" font-weight="650" fill="${color}">${value}%</text>
-    <text x="360" y="288" text-anchor="middle" font-family="Outfit, sans-serif" font-size="12" fill="#5c6b7a">AI-like or suspicious</text>
+    <text x="360" y="268" text-anchor="middle" font-family="Outfit, sans-serif" font-size="22" font-weight="650" fill="#6b5b8a">${reading.uncertain}%</text>
+    <text x="360" y="288" text-anchor="middle" font-family="Outfit, sans-serif" font-size="12" fill="#5c6b7a">Inconclusive</text>
   </svg>`;
 }
 
 function showReport(result) {
   const reading = readingOf(result.flagged_percent, result.uncertain_percent);
-  drawGauge(document.querySelector("#donut"), reading, "suspicious");
+  drawGauge(document.querySelector("#donut"), reading, "AI-like");
   document.querySelector("#donut-blurb").textContent = `${explainReading(reading)} Confidence is ${result.confidence}.`;
   document.querySelector("#confidence-line").textContent = "";
 

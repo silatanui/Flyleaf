@@ -50,7 +50,7 @@
       <div id="report-empty" class="empty-report">
         <p class="eyebrow">Result</p>
         <h2>The reading lands here</h2>
-        <p>Check for AI uses a semicircle, like a speedometer. The shaded arc fades from green to red as the suspicious share rises.</p>
+        <p>Check for AI uses a semicircle, like a speedometer. The needle is the share classified as AI-like. Inconclusive lines stay beside it, not inside it.</p>
       </div>
 
       <div id="report-body" hidden>
@@ -64,7 +64,7 @@
           <span class="swatch human">Human-like</span>
         </div>
         <article id="essay" class="essay"></article>
-        <p class="footnote">The needle is the suspicious share: lines classified as AI-like, plus lines that were inconclusive. Cyan highlights were classified as AI-like. Purple highlights were inconclusive. The result is an estimate, not a finding.</p>
+        <p class="footnote">The needle is only the share classified as AI-like. Inconclusive is the separate number on the right. Cyan highlights were classified as AI-like. Purple highlights were inconclusive. The result is an estimate, not a finding.</p>
       </div>
 
       <div id="rewrite-body" hidden>
@@ -78,7 +78,7 @@
           <button id="copy" type="button" class="ghost">Copy</button>
           <button id="check-rewrite" type="button" class="ghost">Check this rewrite</button>
         </div>
-        <p class="footnote">Before and after use the same suspicious share as Check for AI. A lower number means less of the rewrite was read as AI-like or inconclusive.</p>
+        <p class="footnote">Before and after use the same AI-like headline as Check for AI. Inconclusive stays a separate number. A lower headline means less of the rewrite was classified as AI-like.</p>
       </div>
     </section>
   </div>
@@ -95,5 +95,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/app.js') }}?v=21"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=22"></script>
 {% endblock %}

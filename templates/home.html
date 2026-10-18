@@ -6,7 +6,7 @@
     <div class="hero-copy">
       <p class="eyebrow">Writing review</p>
       <h1>A first reading, before a percentage stands in for a decision.</h1>
-      <p class="lede">Flyleaf reviews English prose and shows the share that looks AI-like or inconclusive. Paste a paragraph, or upload a PDF and keep the marked pages. The result is an estimate. It does not establish that a text was written by AI.</p>
+      <p class="lede">Flyleaf reviews English prose and shows the share classified as AI-like. Inconclusive lines stay beside that number. Paste a paragraph, or upload a PDF and keep the marked pages. The result is an estimate. It does not establish that a text was written by AI.</p>
       <div class="hero-actions">
         <a class="button" href="{{ url_for('check') }}">Check for AI</a>
         <a class="button ghost" href="#method">See how it works</a>
@@ -35,7 +35,7 @@
     <article>
       <p>01</p>
       <h2>Check for AI</h2>
-      <p>The gauge sits under the draft. The shaded arc fades from green to red as the suspicious share rises.</p>
+      <p>The gauge sits under the draft. The needle is the share classified as AI-like. The arc fades from green to red as that share rises.</p>
     </article>
     <article>
       <p>02</p>
@@ -50,7 +50,7 @@
     <article>
       <p>04</p>
       <h2>Highlights you can see</h2>
-      <p>Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive, and those lines stay inside the suspicious share.</p>
+      <p>Cyan marks lines classified as AI-like. Purple marks inconclusive lines. Those lines are listed beside the headline, not added into it.</p>
     </article>
   </section>
 
@@ -86,7 +86,7 @@
           <span>02</span>
           <div>
             <h3>Read the result</h3>
-            <p>The needle is the suspicious share. The sentence under it says how much was classified as AI-like and how much was inconclusive.</p>
+            <p>The needle is the share classified as AI-like. The sentence under it also gives the inconclusive share, kept separate.</p>
           </div>
         </li>
         <li>
@@ -102,15 +102,15 @@
 
   <section class="cards-section" id="scores">
     <p class="eyebrow">How to read a score</p>
-    <h2>Two shares, and the uncertainty inside them.</h2>
+    <h2>A headline, and a separate note.</h2>
     <div class="cards">
       <article class="card">
-        <h3>Suspicious share</h3>
-        <p>Lines classified as AI-like, plus lines that were inconclusive. That is the number on the gauge, from 0 to 100.</p>
+        <h3>AI-like</h3>
+        <p>The number on the gauge. Only lines classified as AI-like. Inconclusive lines are not added in.</p>
       </article>
       <article class="card">
-        <h3>Human-like share</h3>
-        <p>The rest of the scored writing. A mixed draft should not collapse into one color. Read the highlights beside the number.</p>
+        <h3>Inconclusive</h3>
+        <p>A separate note beside the headline. Purple highlights are a reason to reread, not part of the AI-like score.</p>
       </article>
       <article class="card">
         <h3>Confidence</h3>

@@ -248,21 +248,20 @@ def _overview(page, width, fontname, fontobj, result: dict, filename: str, total
     height = page.rect.height
     _bar(page, width, height, fontname, fontobj, 2, total, "AI Writing Overview", filename, True, heavy=True)
     _bar(page, width, height, fontname, fontobj, 2, total, "AI Writing Overview", filename, False, heavy=True)
-    detected = int(result.get("detected_percent") or 0)
     ai_only = int(result.get("flagged_percent") or 0)
     unsure = int(result.get("uncertain_percent") or 0)
     x = 48
     y = 78
     content_w = width - 96
-    score = f"{detected}%"
+    score = f"{ai_only}%"
     _put(page, (x, y), score, 32, fontname, BLUE, heavy=True)
-    _put(page, (x + _width(fontobj, score, 32) + 8, y), "detected as AI", 18, fontname, BLUE, heavy=True)
+    _put(page, (x + _width(fontobj, score, 32) + 8, y), "AI-like", 18, fontname, BLUE, heavy=True)
     y += 22
     y = _write(
         page,
         fontname,
         fontobj,
-        "The percentage covers the whole document. Passages are read together, not one printed line at a time.",
+        "The headline is only passages classified as AI-like. Inconclusive passages are listed separately and are not added into that number.",
         x,
         y,
         content_w * 0.62,
