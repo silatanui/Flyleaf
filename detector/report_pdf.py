@@ -1,4 +1,4 @@
-"""Turnitin-style writing report: cover, overview, then the original pages."""
+"""Writing report: cover, overview, then the original pages with marks."""
 
 from __future__ import annotations
 
@@ -10,10 +10,12 @@ import fitz
 
 ROOT = Path(__file__).resolve().parent.parent
 FONT_FILE = ROOT / "static" / "fonts" / "JosefinSans-Regular.ttf"
+FONT_MEDIUM = ROOT / "static" / "fonts" / "JosefinSans-Medium.ttf"
+FONT_LIGHT = ROOT / "static" / "fonts" / "JosefinSans-ExtraLight.ttf"
 
 WHITE = (1, 1, 1)
-INK = (0.12, 0.14, 0.16)
-MUTED = (0.28, 0.34, 0.40)
+INK = (0.10, 0.12, 0.14)
+MUTED = (0.22, 0.26, 0.30)
 RULE = (0.86, 0.88, 0.90)
 BLUE = (0 / 255, 87 / 255, 184 / 255)
 CYAN = (184 / 255, 232 / 255, 240 / 255)
@@ -118,17 +120,22 @@ def _hits(page, sentence: str) -> list:
 
 
 def _font():
-    if FONT_FILE.exists():
-        try:
-            return fitz.Font(fontfile=str(FONT_FILE)), "josefin"
-        except Exception:
-            pass
+    # ExtraLight (~200) for cover/overview; fall back toward Regular.
+    for path in (FONT_LIGHT, FONT_FILE, FONT_MEDIUM):
+        if path.exists():
+            try:
+                return fitz.Font(fontfile=str(path)), "josefin"
+            except Exception:
+                continue
     return fitz.Font("helv"), "helv"
 
 
 def _use_font(page, fontname: str) -> None:
-    if fontname == "josefin" and FONT_FILE.exists():
-        page.insert_font(fontname="josefin", fontfile=str(FONT_FILE))
+    if fontname != "josefin":
+        return
+    path = FONT_LIGHT if FONT_LIGHT.exists() else FONT_FILE if FONT_FILE.exists() else FONT_MEDIUM
+    if path and path.exists():
+        page.insert_font(fontname="josefin", fontfile=str(path))
 
 
 def _width(fontobj, text: str, size: float) -> float:
@@ -208,13 +215,22 @@ def _cover(page, width, fontname, fontobj, result: dict, filename: str, file_siz
     _bar(page, width, page.rect.height, fontname, fontobj, 1, total, "Cover Page", filename, True, heavy=True)
     _bar(page, width, page.rect.height, fontname, fontobj, 1, total, "Cover Page", filename, False, heavy=True)
     title = Path(filename).stem.replace("_", " ") or "Draft"
-    y = 168
-    y = _write(page, fontname, fontobj, title, 48, y, width - 96, 26, INK, leading=30, heavy=True)
-    y += 6
-    _put(page, (48, y), "AI writing report", 14, fontname, MUTED, heavy=True)
-    y += 48
+    ai_only = int(result.get("flagged_percent") or 0)
+    unsure = int(result.get("uncertain_percent") or 0)
+    y = 118
+    y = _write(page, fontname, fontobj, title, 48, y, width - 96, 28, INK, leading=32, heavy=True)
+    y += 4
+    _put(page, (48, y), "AI writing report", 14, fontname, BLUE, heavy=True)
+    y += 28
+    score_box = fitz.Rect(48, y, 220, y + 78)
+    page.draw_rect(score_box, color=None, fill=CAUTION)
+    _put(page, (score_box.x0 + 14, score_box.y0 + 28), f"{ai_only}%", 28, fontname, BLUE, heavy=True)
+    _put(page, (score_box.x0 + 14, score_box.y0 + 48), "AI-like share", 11, fontname, INK, heavy=True)
+    _put(page, (score_box.x1 + 18, score_box.y0 + 28), f"{unsure}% inconclusive", 12, fontname, INK, heavy=True)
+    _put(page, (score_box.x1 + 18, score_box.y0 + 48), "Kept separate from the headline", 10, fontname, MUTED, heavy=True)
+    y = score_box.y1 + 28
     _put(page, (48, y), "Document details", 12, fontname, INK, heavy=True)
-    y += 22
+    y += 20
     when = datetime.now().strftime("%b %d, %Y, %I:%M %p")
     size_mb = file_size / (1024 * 1024)
     size_label = f"{size_mb:.1f} MB" if size_mb >= 0.1 else f"{max(file_size, 1) / 1024:.0f} KB"
@@ -223,24 +239,42 @@ def _cover(page, width, fontname, fontobj, result: dict, filename: str, file_siz
         ("Reviewed", when),
         ("File size", size_label),
         ("Words scored", f"{int(result.get('scored_words') or 0):,}"),
+        ("Confidence", str(result.get("confidence") or "medium").title()),
     )
     for label, value in rows:
         _put(page, (48, y), label, 9, fontname, MUTED, heavy=True)
-        y += 14
+        y += 13
         y = _write(page, fontname, fontobj, str(value), 48, y, 250, 11, INK, leading=14, heavy=True)
-        y += 10
-    box = fitz.Rect(width - 230, 250, width - 48, 390)
+        y += 8
+    box = fitz.Rect(width - 230, 250, width - 48, 430)
     page.draw_rect(box, color=None, fill=BOX)
+    page.draw_rect(fitz.Rect(box.x0, box.y0, box.x0 + 4, box.y1), color=None, fill=BLUE)
     facts = (
-        (f"{int(result.get('source_pages') or 0)}", "Pages"),
+        (f"{int(result.get('source_pages') or 0)}", "Pages in the draft"),
         (f"{int(result.get('word_count') or 0):,}", "Words"),
         (f"{int(result.get('character_count') or 0):,}", "Characters"),
+        (f"{total}", "Pages in this report"),
     )
     fy = 278
     for value, label in facts:
-        _put(page, (box.x0 + 16, fy), value, 16, fontname, INK, heavy=True)
-        _put(page, (box.x0 + 16, fy + 16), label, 10, fontname, MUTED, heavy=True)
-        fy += 36
+        _put(page, (box.x0 + 18, fy), value, 16, fontname, INK, heavy=True)
+        _put(page, (box.x0 + 18, fy + 16), label, 10, fontname, MUTED, heavy=True)
+        fy += 34
+    note_y = max(y, box.y1) + 24
+    _put(page, (48, note_y), "How to use this file", 12, fontname, INK, heavy=True)
+    _write(
+        page,
+        fontname,
+        fontobj,
+        "The cover gives the headline. The next page explains the groups. Later pages keep your original text with cyan marks for AI-like lines and purple marks for inconclusive lines. A percentage is a reason to reread, not a finding of misconduct.",
+        48,
+        note_y + 18,
+        width - 96,
+        11,
+        INK,
+        leading=15,
+        heavy=True,
+    )
 
 
 def _overview(page, width, fontname, fontobj, result: dict, filename: str, total: int) -> None:
@@ -324,7 +358,7 @@ def _overview(page, width, fontname, fontobj, result: dict, filename: str, total
         page,
         fontname,
         fontobj,
-        "Every extracted word is included. Cyan marks a passage read as AI-like. Purple marks a passage the model could not place. A different detector can still disagree, including with Turnitin. Prepared as a free portfolio project by Tanui Kipngetich Sila.",
+        "Every extracted word is included. Cyan marks a passage read as AI-like. Purple marks a passage the model could not place. A different detector can still disagree. Prepared as a free portfolio project by Tanui Kipngetich Sila.",
         x,
         y,
         content_w,

@@ -530,13 +530,39 @@ def uploads_today(user_id: int) -> int:
     return int(row["total"]) if row else 0
 
 
-def _usage(user_id: int) -> dict:
+def is_admin_user(user: dict | None) -> bool:
+    if not user:
+        return False
+    email = str(user.get("email") or "").strip().lower()
+    return email == ADMIN_EMAIL.lower() or str(user.get("role") or "") == "admin"
+
+
+def can_upload_pdf(user: dict | None) -> tuple[bool, str]:
+    """PDF uploads only. Pasted checks stay free and uncapped."""
+    if user is None:
+        return False, "Sign in to upload a PDF. Pasted text on the checker stays free."
+    if is_admin_user(user):
+        return True, ""
+    if uploads_today(int(user["id"])) >= FREE_DAILY_UPLOADS:
+        return False, "The free plan includes 5 PDF uploads a day. Pasted text stays free. Try again tomorrow."
+    return True, ""
+
+
+def _usage(user_id: int, user: dict | None = None) -> dict:
     used = uploads_today(user_id)
+    if user is not None and is_admin_user(user):
+        return {
+            "uploads_used": used,
+            "uploads_left": None,
+            "uploads_limit": None,
+            "uploads_unlimited": True,
+        }
     left = max(0, FREE_DAILY_UPLOADS - used)
     return {
         "uploads_used": used,
         "uploads_left": left,
         "uploads_limit": FREE_DAILY_UPLOADS,
+        "uploads_unlimited": False,
     }
 
 
@@ -657,7 +683,7 @@ def _file_title(name: str) -> str:
     return (base or "draft")[:160]
 
 
-def keep_document(user_id: int, filename: str, result: dict, review_id: str) -> int:
+def keep_document(user_id: int, filename: str, result: dict, review_id: str, user: dict | None = None) -> int:
     del result
     title = _file_title(filename)
     if not title.lower().endswith(".pdf"):
@@ -667,8 +693,9 @@ def keep_document(user_id: int, filename: str, result: dict, review_id: str) -> 
     existing = saved_id_for_review(user_id, review_id)
     if existing:
         return existing
-    if uploads_today(user_id) >= FREE_DAILY_UPLOADS:
-        raise ValueError("The free plan includes 5 PDF uploads a day. Try again tomorrow.")
+    allowed, message = can_upload_pdf(user or {"id": user_id, "email": "", "role": "member"})
+    if not allowed:
+        raise ValueError(message or "The free plan includes 5 PDF uploads a day. Try again tomorrow.")
     meta = REVIEW_DIR / f"{review_id}.json"
     pdf = REVIEW_DIR / f"{review_id}.pdf"
     if not meta.is_file() or not pdf.is_file():
@@ -908,7 +935,7 @@ def init_accounts(app) -> None:
             return redirect(url_for("login", next="/dashboard"))
         try:
             items = list_saved(user["id"], "pdf")
-            usage = _usage(user["id"])
+            usage = _usage(user["id"], user)
         except OperationalError:
             return render_template("auth.html", mode="offline", error=database_error()), 503
         return render_template("dashboard.html", items=items, **usage)
@@ -919,7 +946,7 @@ def init_accounts(app) -> None:
         if user is None:
             return redirect(url_for("login", next="/plans"))
         try:
-            usage = _usage(user["id"])
+            usage = _usage(user["id"], user)
         except OperationalError:
             return render_template("auth.html", mode="offline", error=database_error()), 503
         return render_template("plans.html", **usage)
@@ -930,7 +957,7 @@ def init_accounts(app) -> None:
         if user is None:
             return redirect(url_for("login", next="/account"))
         try:
-            usage = _usage(user["id"])
+            usage = _usage(user["id"], user)
         except OperationalError:
             return render_template("auth.html", mode="offline", error=database_error()), 503
         return render_template("account.html", error="", **usage)
@@ -957,7 +984,7 @@ def init_accounts(app) -> None:
             )
         except ValueError as exc:
             try:
-                usage = _usage(user["id"])
+                usage = _usage(user["id"], user)
             except OperationalError:
                 return render_template("auth.html", mode="offline", error=database_error()), 503
             return render_template("account.html", error=str(exc), **usage)
@@ -1054,7 +1081,7 @@ def init_accounts(app) -> None:
         filename = _file_title(str(payload.get("filename") or result.get("filename") or "draft"))
         review_id = str(payload.get("review_id") or result.get("review_id") or "")
         try:
-            item_id = keep_document(user["id"], filename, result, review_id)
+            item_id = keep_document(user["id"], filename, result, review_id, user=user)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except OperationalError:
@@ -1104,6 +1131,10 @@ def init_accounts(app) -> None:
             if existing:
                 flash("This report is already in your saved work.")
                 return redirect(url_for("review", review_id=review_id))
+            allowed, message = can_upload_pdf(user)
+            if not allowed:
+                flash(message)
+                return redirect(url_for("review", review_id=review_id))
             filename = str(summary.get("filename") or "draft.pdf")[:160]
             stored = {
                 "filename": filename,
@@ -1127,7 +1158,10 @@ def init_accounts(app) -> None:
         except IntegrityError:
             flash("This report is already in your saved work.")
             return redirect(url_for("review", review_id=review_id))
-        except (OperationalError, json.JSONDecodeError, ValueError):
+        except ValueError as exc:
+            flash(str(exc))
+            return redirect(url_for("review", review_id=review_id))
+        except (OperationalError, json.JSONDecodeError):
             flash(database_error())
             return redirect(url_for("review", review_id=review_id))
         flash("This report is in your saved work.")

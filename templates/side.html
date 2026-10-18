@@ -1,16 +1,20 @@
 <aside class="side">
+  {% if uploads_unlimited %}
+  <p class="side-usage">Unlimited PDF uploads</p>
+  {% else %}
   <p class="side-usage">{{ uploads_left }} of {{ uploads_limit }} PDF uploads left today</p>
+  {% endif %}
   <a class="side-link{% if request.endpoint == 'dashboard' %} active{% endif %}" href="{{ url_for('dashboard') }}">
     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="3.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3.5" y="13.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="13.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
     Documents
   </a>
-  {% if request.endpoint == 'dashboard' and uploads_left > 0 %}
+  {% if request.endpoint == 'dashboard' and (uploads_unlimited or uploads_left > 0) %}
   <label class="side-link" for="doc-file">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 8 4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
     Upload a file
   </label>
   {% else %}
-  <a class="side-link{% if uploads_left == 0 %} is-disabled{% endif %}" href="{{ url_for('dashboard') }}">
+  <a class="side-link{% if not uploads_unlimited and uploads_left == 0 %} is-disabled{% endif %}" href="{{ url_for('dashboard') }}">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 8 4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
     Upload a file
   </a>

@@ -1,0 +1,183 @@
+Chapter 1: Introduction
+
+1.1. Background of Study
+
+The global landscape of commerce has undergone a seismic shift, transitioning from physical storefronts to digital ecosystems that operate 24/7 across geographic boundaries. This transformation, accelerated by rapid advancements in internet accessibility and consumer behavior, has forced industries to redefine their engagement models. In the luxury retail sector, particularly within horology, this shift is characterized by a unique challenge: maintaining the Aura of Exclusivity and Technical Mastery in a medium that is traditionally seen as transactional and impersonal. According to McKinsey & Company (2024), luxury e-commerce is no longer a secondary channel but a primary touchpoint for over 70% of the modern Gen Z and 'Millennial' clientele, who prize speed and transparency as much as craftsmanship.
+
+Historically, the purchase of a high-end timepiece, a machine of extreme precision, was an event mediated by expert horologists in exclusive boutiques. These experts provided the bridge between the mechanical complexity of the movement and the aesthetic desires of the buyer. In the digital realm, this bridge is often broken. Consumers are presented with vast amounts of data but lack the contextual expertise to interpret it. As Nielsen (2023) identifies, this Paradox of Choice leads to decision paralysis and high cart abandonment rates in technical retail. The emergence of Artificial Intelligence (AI) and modern web frameworks like Microsoft Blazor offers a path toward recreating this expertise through autonomous, grounded agents capable of facilitating technical support at scale (Deloitte, 2024).
+
+Furthermore, the integration of these technologies must account for regional disparities in the digital economy. While the global North has largely standardized around credit-based payment systems, emerging economies in East Africa, led by Kenya, have pioneered mobile money ecosystems like M-PESA. A truly automated and effective e-commerce platform must, therefore, be both technically intelligent and culturally/regionally compatible. This dual requirement technically precise information and localized payment finality forms the core architectural motivation for this research.
+
+1.2. Personal Context and Professional Background
+
+The conceptualization of this research is profoundly influenced by my tenure as a customer care agent in a high-volume e-commerce organization. This role served as an ethnographic immersion into the operational frictions of modern retail. On a daily basis, I was tasked with being the Human Buffer between a complex product catalog and a knowledgeable, demanding customer base. I witnessed firsthand the systemic breakdown of information flow. For instance, I recall multiple scenarios where a customer would inquire about specific technical attributes of a timepiece such as the material of the balance spring or the frequency of the movement only to be met with a generic response while I manually searched through disparate internal databases. This Supervisor Bottleneck, where agents must wait for higher-level intervention or documentation clarification, often resulted in wait times of over 15 minutes for a single technical question.
+
+During my time on the front lines, I realized that the primary source of customer frustration was not the lack of a solution, but the latency of the information provided. In the luxury market, every minute of delay represents a degradation of brand trust. I observed that approximately 40% of technical inquiries were repetitive in nature, yet required manual processing because the existing keyword-based search systems on the website were insufficient to answer nuanced queries. This realization was the 'Eureka Moment': if a machine could be grounded in the same technical truth as an expert watchmaker, and speak to the customer with the immediacy of a digital native, the efficiency of the entire ecosystem would increase exponentially.
+
+This background as a customer care agent provided me with a User-Centric perspective that is often missing in purely architectural software research. It taught me that an e-commerce platform is not just a collection of CRUD operations; it is a conversation. My experience highlighted three critical areas of failure in manual systems: the exhaustion of the human agent under high-volume pressure, the inconsistency of answers provided across different shifts, and the high cost of training staff to the level of horological mastery required to represent a premium brand. These insights directly informed the Agentic design of the proposed Tanui Watch Store system.
+
+1.3. Problem Statement
+
+Despite the maturity of the e-commerce sector, high-end technical retail is currently crippled by a trifecta of interlinked problems that human-centric models cannot solve efficiently at scale. These issues manifest as a direct threat to the sustainability of digital-first luxury brands.
+
+1.3.1. The Crisis of Knowledge Asymmetry
+
+There is a widening gap between the technical complexity of the products sold (e.g., inhouse calibers, silicon components, water-resistance ratings) and the informational accessibility provided by standard platforms. Customers frequently have a Technical Intent that cannot be satisfied by filtered search. As Smith and Jones (2022) argue, when a customer in a premium segment receives a generic response to a specific mechanical question, the perceived value of the product drops, and the brand is categorized as Mass-Market regardless of the actual product price. This knowledge asymmetry creates a barrier to entry for new collectors and leads to expensive returns when products are purchased without full understanding.
+
+1.3.2. Operational Scalability and Response Latency
+
+Modern e-commerce requires real-time responses. As established in my personal background, the manual processing of queries leads to severe latency. In a globalized market, a brand may receive thousands of varied queries simultaneously. A human-centric model is fundamentally 'Inelastic' it cannot scale without linear increases in headcount and training overhead. Forrester Research (2024) indicates that 55% of consumers will abandon an online purchase if they cannot find a quick answer to their question. This latency is particularly detrimental during promotional periods or new product launches, where the volume overwhelms even the most competent support teams.
+
+1.3.3. Regional Payment Friction in Emerging Markets
+
+A secondary, but equally critical, problem is the Payment Disconnect. Global ecommerce frameworks are predominantly optimized for Visa, Mastercard, and PayPal. However, in the Kenyan context, mobile money is the primary driver of financial inclusion. The lack of native, seamless M-PESA integration in premium storefronts creates an artificial barrier for local luxury enthusiasts. This Checkout Friction nullifies the entire customer journey at the very last step, resulting in lost revenue and a sense of Digital Exclusion (Kiwuitu, 2023).
+
+1.4. Motivation
+
+The motivation for this study is to synthesize my professional experience as a support agent with modern software engineering principles to create an Autonomous Retail Concierge. The goal is to move the e-commerce interaction from a static 'Search and Add' workflow to a dynamic, Conversation-Driven experience. By utilizing Retrieval-Augmented Generation (RAG), we aim to provide an AI that does not hallucinate, a critical requirement in the luxury sector where factual accuracy regarding materials and movements is non-negotiable. The ambition is to create a system that liberates human talent from the drudgery of answering 'Where is my order?' or 'Do you have this in blue?', allowing them to participate only in high-value consultative sales where human intuition is still paramount.
+
+1.5. Research Objectives
+
+The primary objective is the implementation of a comprehensive, AI-integrated storefront that solves the identified bottlenecks. Specific objectives include:
+
+To design a frontend architecture using Blazor WebAssembly that provides a near-native app experience within the browser for luxury browsing.
+
+To implement a RAG pipeline that transforms technical horological documentation into a searchable vector space using OpenAI's 'text-embedding-3-small' models.
+
+To build a .NET-based backend that orchestrates the flow between the SQL relational data (orders) and the Qdrant vector data (technical product knowledge).
+
+To successfully integrate the Safaricom Daraja API 2.0 to support one-click mobile payment through STK Push functionality.
+
+To validate the system's ability to reduce query latency compared to theoretical human-bound benchmarks.
+
+1.6. Research Questions
+
+How can the RAG architecture be optimized to ensure 100% factual grounding in high-stakes technical product environments like horology?
+
+Does the integration of localized mobile payment methods significantly decrease the Abandoned Cart' rate in the Kenyan luxury demographic?
+
+What are the performance trade-offs of using C# and Blazor WebAssembly for high-frequency AI interactions compared to traditional JavaScript frameworks like React?
+
+1.7. Scope and Delimitations
+
+This research focuses exclusively on the technical implementation of an e-commerce platform for the luxury watch market. The AI model focus is on 'Informational agents' rather than generative creative agents. The payment scope is delimited to the M-PESA STK Push protocol via Safaricom's Daraja gateway. The study assumes a stable internet connection for the WebAssembly runtime and does not address offline-first scenarios. Geographical focus is centered on the Kenyan market for localized features, while the storefront design follows global luxury aesthetic standards.
+
+1.8. Definition of Terms
+
+Blazor: A web framework by Microsoft for building interactive web UIs using C# instead of JavaScript.
+
+RAG (Retrieval-Augmented Generation): A technique for enhancing the output of an LLM with external facts retrieved from a trusted knowledge source.
+
+Vector Database: A storage system optimized for mathematical multi-dimensional representations of data.
+
+Daraja API: The developer gateway for Safaricom's M-PESA API services.
+
+Horological Complication: Any feature on a watch that goes beyond the simple display of hours, minutes, and seconds.
+
+1.9. Significance of Study
+
+This study is significant for three distinct stakeholders. For the Retailer, it provides a blueprint for reducing operational overhead while increasing customer engagement. For the Customer, it provides access to a 24/7 expert that respects their time and technical intent. For the Academic Community, it demonstrates a practical, enterprise-grade implementation of RAG within the emerging .NET/Blazor ecosystem, shifting the discourse from AI as a Chatbot to AI as an Integrated Business Engine.
+
+Chapter 5: Conclusion
+
+The previous four chapters have laid out everything that went into building the Tanui Watch Store, from identifying the real-world problem to designing the architecture and writing the actual code. This final chapter brings all of that together. It looks back at the goals that were set at the start, gives an honest account of what was achieved and what was not, and suggests where this work could go next. The aim is to leave the reader with a clear understanding of what this project accomplished and why it matters.
+
+5.1. Summary of Work
+
+The Tanui Watch Store is a full-stack e-commerce application for the luxury watch market, built on the Microsoft Blazor WebAssembly framework. The system was designed to solve two specific problems that the author encountered firsthand as a customer support agent: the difficulty of answering complex technical questions quickly, and the lack of a smooth payment option for Kenyan shoppers who rely on M-PESA.
+
+To solve the first problem, the system uses a Retrieval-Augmented Generation (RAG) pipeline. When a customer asks a technical question, the system searches a Qdrant vector database for the most relevant product information, then passes that information to the GPT-4o-mini language model to produce a factual, grounded answer. This means the AI cannot make things up; it can only answer from verified product data. To solve the second problem, the Safaricom Daraja 2.0 API was integrated so that customers can pay in a single step using M-PESA, without having to manually enter USSD codes.
+
+On the technical side, the application uses ASP.NET Core 8 for the backend API, Entity Framework Core with SQLite for relational data, SignalR for real-time payment notifications, and Azure for deployment. The admin panel gives store managers full control over products, orders, transactions, and chat history.
+
+5.2. Research Objectives Revisited
+
+Section 1.5 defined five specific objectives for this project. Looking back at each one honestly, here is how they turned out.
+
+Objective: Build a Blazor WebAssembly frontend providing a near-native browsing experience.
+Outcome: Achieved.
+Evidence: In-app navigation runs under 50 ms after the initial load. The product catalog, cart, checkout wizard, and admin panel all work as designed (Section 4.3.1).
+
+Objective: Implement a RAG pipeline using OpenAI embeddings and Qdrant for factual AI responses.
+Outcome: Achieved.
+Evidence: The pipeline produces 1,536-dimensional vectors, retrieves the top 5 results by cosine similarity, and injects them into the prompt. Sanitisation prevents hallucination from bad input (Sections 3.3 and 4.3.2).
+
+Objective: Build a .NET backend that connects the relational database and the vector store.
+Outcome: Achieved.
+Evidence: The hybrid persistence layer keeps SQL and vector data in sync using an async re-embed step whenever a product is updated (Section 3.2.4).
+
+Objective: Integrate Safaricom Daraja 2.0 for M-PESA STK Push payments.
+Outcome: Achieved.
+Evidence: The full payment lifecycle was validated in the Daraja sandbox, including callback handling, a 90-second timeout, and phone number normalisation (Sections 3.4 and 4.3.3).
+
+Objective: Validate that the system reduces query response time compared to human agents.
+Outcome: Partially achieved.
+Evidence: The AI pipeline responds in 1.5 to 2.5 seconds, but no controlled comparison against real human agent response times was conducted. This is acknowledged as a limitation in Section 5.4.
+
+The fifth objective deserves a transparent note. The thesis guidelines state that if a goal could not be fully proved, it should be communicated clearly and without apology. That is the case here. The AI pipeline is fast, but there was no formal study comparing it to real human agents under comparable conditions. That comparison would require a live deployment with real customers, which was outside the scope of this project. The speed benchmarks still provide useful reference data, they just cannot be treated as comparative proof.
+
+5.3. Research Questions Answered
+
+5.3.1. How can RAG be optimised for factual accuracy in a technical retail context?
+
+The short answer is: keep the model on a short leash. The system achieves this through four steps. First, the user input is sanitised to remove anything that might confuse the embedding model, like emojis or HTML tags. Second, the cleaned query is converted into a vector and matched against the product knowledge base in Qdrant. Third, only the top five most relevant results are selected. Fourth, those results are inserted directly into the prompt before the language model ever generates a response, so the model is always working from real product data rather than from memory.
+
+One thing the implementation made clear is that this is not a set-and-forget solution. The accuracy of the AI is only as good as the product data in Qdrant. If that data goes stale, the answers will too. Keeping the knowledge base current is an ongoing responsibility, not a one-time setup task.
+
+5.3.2. Does M-PESA integration reduce cart abandonment for Kenyan shoppers?
+
+A proper A/B test measuring actual cart abandonment was not run, so there is no percentage to point to. What the implementation does confirm is that the operational cause of abandonment identified in the literature, specifically the need to manually dial a USSD code, has been removed. The customer enters their phone number, receives a payment prompt directly on their handset, enters their PIN, and sees a confirmation in under a second via SignalR. That path is meaningfully shorter and less error-prone than what most Kenyan shoppers face on international platforms.
+
+Proving the actual effect on abandonment rates would require a live production deployment with real transactions and user tracking, and that is the clearest recommendation for follow-on research.
+
+5.3.3. What are the trade-offs of Blazor WebAssembly compared to JavaScript frameworks for AI-heavy applications?
+
+The most obvious trade-off is the first load time. Because the .NET runtime has to be downloaded to the browser once, the application takes 2 to 3 seconds to start on first visit. A React app would paint faster. Once the runtime is cached, however, subsequent navigation is under 50 milliseconds, which is as fast as any client-side framework.
+
+The bigger advantage of Blazor in this project was the shared code. The same C# data transfer objects and validation logic are used on the client and the server. In a mixed TypeScript and C# setup, those would have to be maintained in two places and kept manually in sync. That kind of duplication is a genuine source of bugs in production systems, and Blazor eliminates it entirely.
+
+For the AI pipeline specifically, the framework choice makes no difference to the response time. The 1.5 to 2.5 second wait is the OpenAI API round trip. A React front-end calling the same .NET API would have identical performance.
+
+5.4. Limitations of the Study
+
+Being clear about what this project did not do is just as important as describing what it did. The following limitations are worth noting.
+
+No real user study. Every usability observation in this thesis came from the author testing the application. No participants were recruited, and no formal usability metrics were collected.
+
+Single-user performance figures. The latency numbers were measured with one user on a development machine. How the system performs under ten or a hundred concurrent users was not tested.
+
+No automated tests. The testing strategy was entirely manual. There is no xUnit or bUnit test suite, which means there is no automated safety net when the code changes.
+
+Daraja sandbox only. The M-PESA integration was tested against Safaricom sandbox credentials with simulated payments. Going live requires formal business registration with Safaricom and introduces real-money regulatory obligations that were outside the scope of this work.
+
+SQLite is not production-scale. SQLite works well for a single developer and light traffic. A real commercial deployment would need PostgreSQL or SQL Server to handle concurrent writes safely.
+
+No hallucination metric. The RAG design reduces hallucination by construction, but there was no formal measurement of how often the model stayed within the retrieved context. Tools like RAGAS exist for exactly this purpose and should be applied in future work.
+
+5.5. Future Work and Recommendations
+
+The limitations above point to the most natural next steps. Beyond fixing gaps, there are also genuine extensions worth pursuing.
+
+Run a real user study. Recruit a group of Kenyan watch enthusiasts, give them the live system, and measure completion rates, satisfaction scores, and where they get stuck. This is the single most valuable thing that could be done to validate the project claims.
+
+Add automated tests. Write an xUnit test suite covering at minimum the RAG pipeline, the M-PESA callback handler, and the checkout state machine. Without these, the codebase is fragile and difficult for another developer to extend safely.
+
+Test under load. Use a tool like k6 to simulate concurrent users and find the point at which SQLite or the API becomes the bottleneck. Then migrate to PostgreSQL and Azure Container Apps with autoscaling to fix it.
+
+Measure RAG quality continuously. Integrate RAGAS or a similar evaluation framework to score retrieval precision and answer faithfulness on a regular basis. This turns a qualitative design claim into a trackable engineering metric.
+
+Add international payment support. Integrating Stripe alongside M-PESA would open the storefront to customers paying in euros or dollars without any architectural changes to the checkout wizard.
+
+Build a mobile app. The .NET MAUI Blazor Hybrid target in .NET 8 allows the same Blazor components to power a native iOS and Android app, sharing all the existing business logic and API code, which makes this a relatively low-cost extension.
+
+Give the AI agent more capabilities. Currently the agent answers questions. Using Semantic Kernel planning, it could also initiate a return, check a delivery status, or flag a product as out of stock, reducing the need for human staff to handle routine post-purchase enquiries.
+
+5.6. Final Reflection
+
+Before this thesis, the author spent time working as a customer support agent in an e-commerce company. That experience was the direct motivation for this project. Every day involved fielding the same kinds of questions, searching the same product documents, and watching customers wait while a human tried to find a precise technical answer that should have been instantly available.
+
+Building the Tanui Watch Store and watching the RAG agent correctly answer a detailed question about a watch movement in roughly two seconds was a satisfying demonstration that the core idea works. Not because it is a flawless system, it has the limitations listed above, but because it proves the concept is sound and buildable with current tools at a cost that is realistic for a small business.
+
+The M-PESA integration was a reminder that building for a specific context is not optional. A payment system that works perfectly for a customer in London can fail completely for a customer in Nairobi if it ignores how people in Nairobi actually pay. Getting that detail right matters as much as any architectural decision.
+
+The hope is that this thesis is useful in two ways. For other developers, it is a concrete example of how to wire together Blazor, a RAG pipeline, and a mobile money API in a single coherent system. For future researchers, it is a starting point that still has clear gaps to fill, particularly around real user data, automated testing, and production-scale validation.

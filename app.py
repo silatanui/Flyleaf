@@ -23,9 +23,11 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import HTTPException
 
-from accounts import current_user, init_accounts, saved_id_for_review
+from accounts import can_upload_pdf, current_user, init_accounts, saved_id_for_review
 from detector.engine import detector
 from detector.humanizer import humanizer
+from detector.plagiarism import similarity
+from detector.plagiarism_pdf import build_similarity_pdf
 from detector.report_pdf import build_reviewed_pdf, pdf_text, write_preview_images
 
 ROOT = Path(__file__).resolve().parent
@@ -34,11 +36,21 @@ JOB_DIR = ROOT / "storage" / "jobs"
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
 init_accounts(app)
 
 _jobs: dict[str, dict] = {}
 _reviews: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
+
+
+def _job_percent(job: dict, done: int, total: int) -> int:
+    """Progress only moves forward so the UI bar never jumps backward."""
+    calc = 6 if total <= 0 else max(6, min(99, round(100 * done / total)))
+    if done >= total > 0:
+        calc = 100
+    return max(int(job.get("percent") or 6), calc)
 
 
 def _safe_name(name: str) -> str:
@@ -71,7 +83,7 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
                 return
             job["done"] = done
             job["total"] = total
-            job["percent"] = 0 if total <= 0 else round(100 * done / total)
+            job["percent"] = _job_percent(job, done, total)
             job["message"] = "Reviewing the draft"
         _publish_job(job_id)
 
@@ -146,6 +158,11 @@ def terms():
     return render_template("terms.html")
 
 
+@app.get("/help")
+def help_page():
+    return render_template("help.html")
+
+
 @app.get("/check")
 def check():
     return redirect(url_for("home") + "#check")
@@ -153,7 +170,12 @@ def check():
 
 @app.get("/humanize")
 def humanize_page():
-    return redirect(url_for("home") + "#check")
+    return redirect(url_for("home") + "#humanize")
+
+
+@app.get("/similarity")
+def similarity_page():
+    return redirect(url_for("home") + "#similarity")
 
 
 @app.get("/review/<review_id>/pages/<int:number>")
@@ -230,6 +252,12 @@ def humanize_status():
     return jsonify({"status": humanizer.status, "error": humanizer.error, "model": humanizer.model_name})
 
 
+@app.get("/api/similarity/status")
+def similarity_status():
+    _start_similarity_load()
+    return jsonify({"status": similarity.status, "error": similarity.error, "model": similarity.model_name})
+
+
 def _run_humanize(job_id: str, text: str) -> None:
     stop = threading.Event()
 
@@ -240,7 +268,7 @@ def _run_humanize(job_id: str, text: str) -> None:
                 return
             job["done"] = done
             job["total"] = total
-            job["percent"] = 0 if total <= 0 else round(100 * done / total)
+            job["percent"] = _job_percent(job, done, total)
         _publish_job(job_id)
 
     def beat() -> None:
@@ -305,6 +333,13 @@ def humanize_api():
     return jsonify({"job_id": job_id, "status": "running", "watch_url": f"{prefix}/jobs/{job_id}.json"})
 
 
+@app.get("/api/upload-quota")
+def upload_quota():
+    user = current_user()
+    allowed, message = can_upload_pdf(user)
+    return jsonify({"allowed": allowed, "error": message or None, "signed_in": user is not None})
+
+
 @app.post("/api/analyze")
 def analyze():
     if detector.status == "loading":
@@ -322,6 +357,10 @@ def analyze():
         text = request.form.get("text") or ""
 
     text = text.strip()
+    if pdf_bytes is not None:
+        allowed, message = can_upload_pdf(current_user())
+        if not allowed:
+            return jsonify({"error": message}), 403
     if pdf_bytes is not None and not text:
         return jsonify({"error": "This PDF has no selectable text. Flyleaf can review text-based PDFs."}), 400
     if not text:
@@ -342,6 +381,134 @@ def analyze():
     _publish_job(job_id)
     if not _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix)):
         return jsonify({"error": "The host could not start the check. Wait a minute and try again."}), 503
+    return jsonify({"job_id": job_id, "status": "running", "watch_url": f"{prefix}/jobs/{job_id}.json"})
+
+
+def _run_similarity(
+    job_id: str,
+    text: str,
+    filename: str,
+    prefix: str = "",
+    open_report: bool = False,
+    pdf_bytes: bytes | None = None,
+) -> None:
+    def progress(done: int, total: int, message: str) -> None:
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if job is None:
+                return
+            job["done"] = done
+            job["total"] = total
+            job["percent"] = _job_percent(job, done, total)
+            job["message"] = message
+        _publish_job(job_id)
+
+    stop = threading.Event()
+
+    def beat() -> None:
+        while not stop.wait(8):
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+                if job is None or job.get("status") != "running":
+                    return
+            _publish_job(job_id)
+
+    try:
+        threading.Thread(target=beat, daemon=True).start()
+    except RuntimeError:
+        pass
+    try:
+        result = similarity.check(text, progress=progress)
+        review_id = uuid.uuid4().hex
+        REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+        path = REVIEW_DIR / f"{review_id}.pdf"
+        report = build_similarity_pdf(result, filename, draft_text=text, pdf_bytes=pdf_bytes)
+        path.write_bytes(report)
+        # Always build preview pages so the report view can show the full submission.
+        page_count = write_preview_images(report, REVIEW_DIR / review_id)
+        summary = {
+            "filename": filename,
+            "kind": "similarity",
+            "overall_percent": result["overall_percent"],
+            "flagged_percent": result["overall_percent"],
+            "uncertain_percent": 0,
+            "word_count": result["word_count"],
+            "source_count": result["source_count"],
+            "warnings": result.get("warnings") or [],
+            "page_count": page_count,
+        }
+        (REVIEW_DIR / f"{review_id}.json").write_text(json.dumps(summary), encoding="utf-8")
+        with _jobs_lock:
+            _reviews[review_id] = {"path": path, "summary": summary}
+        result["review_id"] = review_id
+        if open_report:
+            result["download_url"] = f"{prefix}/review/{review_id}/download"
+            result["review_url"] = f"{prefix}/review/{review_id}"
+        with _jobs_lock:
+            _jobs[job_id]["status"] = "done"
+            _jobs[job_id]["percent"] = 100
+            _jobs[job_id]["result"] = result
+            _jobs[job_id]["message"] = "Opening the report" if open_report else "Similarity ready"
+        _publish_job(job_id)
+    except Exception as exc:
+        with _jobs_lock:
+            _jobs[job_id]["status"] = "error"
+            _jobs[job_id]["error"] = str(exc)
+            _jobs[job_id]["message"] = "The similarity check could not be finished"
+        _publish_job(job_id)
+    finally:
+        stop.set()
+
+
+@app.post("/api/plagiarism")
+def plagiarism_api():
+    _start_similarity_load()
+    if similarity.status == "loading":
+        return jsonify({"error": "The similarity checker is still getting ready. Try again in a minute."}), 503
+    if similarity.status == "error":
+        return jsonify({"error": similarity.error or "The similarity checker failed to load."}), 500
+
+    filename = "draft.txt"
+    pdf_bytes = None
+    if request.files.get("file"):
+        text, pdf_bytes, filename = _read_upload(request.files["file"])
+    elif request.is_json:
+        payload = request.get_json(silent=True) or {}
+        text = payload.get("text") or ""
+        filename = _safe_name(payload.get("filename") or filename)
+    else:
+        text = request.form.get("text") or ""
+        filename = _safe_name(request.form.get("filename") or filename)
+
+    text = text.strip()
+    if pdf_bytes is not None:
+        allowed, message = can_upload_pdf(current_user())
+        if not allowed:
+            return jsonify({"error": message}), 403
+    if pdf_bytes is not None and not text:
+        return jsonify({"error": "This PDF has no selectable text. Flyleaf can compare text-based PDFs."}), 400
+    if not text:
+        return jsonify({"error": "Add some text for a similarity check."}), 400
+
+    open_report = pdf_bytes is not None
+    job_id = uuid.uuid4().hex
+    with _jobs_lock:
+        if any(item.get("kind") == "similarity" and item.get("status") == "running" for item in _jobs.values()):
+            return jsonify({"error": "A similarity check is already running. Give it a moment, then try again."}), 503
+        _jobs[job_id] = {
+            "status": "running",
+            "kind": "similarity",
+            "done": 0,
+            "total": 1,
+            "percent": 6,
+            "message": "Searching public pages",
+            "result": None,
+            "error": None,
+        }
+    prefix = request.script_root.rstrip("/")
+    _publish_job(job_id)
+    if not _spawn(_run_similarity, (job_id, text, filename, prefix, open_report, pdf_bytes)):
+        return jsonify({"error": "The host could not start the similarity check. Wait a minute and try again."}), 503
     return jsonify({"job_id": job_id, "status": "running", "watch_url": f"{prefix}/jobs/{job_id}.json"})
 
 
@@ -461,6 +628,44 @@ def _start_model_load() -> None:
                     if _thread_failures >= 2
                     else None
                 )
+
+
+_similarity_lock = threading.Lock()
+_similarity_running = False
+
+
+def _load_similarity() -> None:
+    global _similarity_running
+    try:
+        if similarity.status != "ready":
+            similarity.status = "loading"
+            similarity.error = None
+            try:
+                similarity.load()
+            except Exception:
+                app.logger.exception("Similarity checker failed to load")
+    finally:
+        with _similarity_lock:
+            _similarity_running = False
+
+
+def _start_similarity_load() -> None:
+    global _similarity_running
+    if similarity.status == "ready":
+        return
+    with _similarity_lock:
+        if _similarity_running or similarity.status == "ready":
+            return
+        _similarity_running = True
+        if similarity.status != "error":
+            similarity.status = "loading"
+        try:
+            threading.Thread(target=_load_similarity, daemon=True).start()
+        except RuntimeError:
+            _similarity_running = False
+            similarity.status = "error"
+            similarity.error = "The host has no free worker slot yet. Wait a minute, then reload this page."
+            app.logger.exception("Flyleaf could not start the similarity loader")
 
 
 _start_model_load()

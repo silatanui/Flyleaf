@@ -9,3 +9,4 @@ pypdf
 pymupdf
 safetensors
 huggingface_hub
+# MiniLM for public-web similarity loads through transformers.AutoModel

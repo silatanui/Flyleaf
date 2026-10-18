@@ -7,23 +7,55 @@
   <main class="app-main">
     <p class="eyebrow">Your account</p>
     <h1>Plans</h1>
-    <p class="lede">The free plan is the only option right now. More plans will be added later.</p>
+    <p class="lede">You are on Free. Writer, Studio, and Extra PDF are planned options with draft prices. They will be added later. Until then, the free allowance stays at 5 PDF uploads a day.</p>
     <div class="plan-grid">
       <article class="plan-card current">
-        <p class="plan-tag">Current plan</p>
+        <p class="plan-tag">Your plan</p>
         <h2>Free</h2>
         <p class="plan-price">No charge</p>
         <ul>
-          <li>5 PDF uploads a day</li>
-          <li>A PDF report you can view and download</li>
-          <li>Documents stay with your account on this computer</li>
+          <li>Paste and check on this page, with no daily cap</li>
+          <li>Humanize and Similarity on this page</li>
+          <li>5 PDF reports kept each day</li>
+          <li>View, download, and delete those reports</li>
         </ul>
         <p class="plan-usage">{{ uploads_used }} of {{ uploads_limit }} used today. {{ uploads_left }} left.</p>
       </article>
       <article class="plan-card later">
-        <p class="plan-tag">Later</p>
-        <h2>More plans</h2>
-        <p>Other plans are not available yet. The free allowance stays at 5 PDF uploads a day until they are.</p>
+        <p class="plan-tag">Coming later</p>
+        <h2>Writer</h2>
+        <p class="plan-price">$7 / month</p>
+        <ul>
+          <li>Everything in Free</li>
+          <li>40 PDF reports kept each month</li>
+          <li>Saved report history on your account</li>
+          <li>Email notice when a long PDF finishes</li>
+        </ul>
+        <p class="plan-note">Not for sale yet. Price may change before launch.</p>
+      </article>
+      <article class="plan-card later">
+        <p class="plan-tag">Coming later</p>
+        <h2>Studio</h2>
+        <p class="plan-price">$16 / month</p>
+        <ul>
+          <li>Everything in Writer</li>
+          <li>150 PDF reports kept each month</li>
+          <li>Larger PDF uploads</li>
+          <li>Batch upload for a small set of files</li>
+        </ul>
+        <p class="plan-note">Not for sale yet. Meant for heavier weekly use.</p>
+      </article>
+      <article class="plan-card later">
+        <p class="plan-tag">Coming later</p>
+        <h2>Extra PDF</h2>
+        <p class="plan-price">$0.45 / PDF</p>
+        <ul>
+          <li>One kept PDF report beyond your plan</li>
+          <li>Same preview and download as a plan report</li>
+          <li>Buy only when you need one more</li>
+          <li>Works with Free, Writer, or Studio later</li>
+        </ul>
+        <p class="plan-note">Pay-per-report top-up. Not available to buy yet.</p>
       </article>
     </div>
   </main>

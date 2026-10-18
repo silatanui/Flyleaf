@@ -4,11 +4,13 @@ const uploadLabel = document.querySelector("#upload-label");
 const wordCount = document.querySelector("#word-count");
 const checkButton = document.querySelector("#run-check");
 const humanizeButton = document.querySelector("#humanize");
+const similarityButton = document.querySelector("#run-similarity");
 const offerHumanize = document.querySelector("#offer-humanize");
 const HIGH_AI = 50;
 const modelState = document.querySelector("#model-state");
 const reportBody = document.querySelector("#report-body");
 const rewriteBody = document.querySelector("#rewrite-body");
+const similarityBody = document.querySelector("#similarity-body");
 const reportEmpty = document.querySelector("#report-empty");
 const progress = document.querySelector("#progress");
 const progressLabel = document.querySelector("#progress-label");
@@ -23,8 +25,12 @@ const samples = {
 
 let detectorReady = false;
 let humanizerReady = false;
+let similarityReady = false;
+let pasteMode = "check";
 let lastCheck = null;
 let lastRewrite = null;
+let lastSimilarity = null;
+let secondaryPoll = 0;
 
 function appRoot() {
   const script = document.querySelector("script[src*='app.js']");
@@ -111,61 +117,52 @@ function gaugeArc(cx, cy, radius, start, end) {
 }
 
 function explainReading(reading) {
-  const { ai, uncertain } = reading;
-  let lead = "The draft was read as human-like.";
-  if (ai > 0 && uncertain === 0) lead = `${ai}% was classified as AI-like.`;
-  if (ai === 0 && uncertain > 0) lead = `None of it was classified as clearly AI-like. ${uncertain}% was inconclusive.`;
-  if (ai > 0 && uncertain > 0) lead = `${ai}% was classified as AI-like. ${uncertain}% was inconclusive.`;
-  return `${lead} The result is an estimate and does not establish whether the text was written by AI.`;
+  const { ai, uncertain, human } = reading;
+  let lead = "Most of this draft was read as human-like.";
+  if (ai >= 60) lead = "Much of this draft was classified as AI-like.";
+  else if (ai >= 25) lead = "This draft is mixed. A clear share was classified as AI-like.";
+  else if (ai > 0 && uncertain > 0) lead = `${ai}% was classified as AI-like, and ${uncertain}% was inconclusive.`;
+  else if (ai > 0) lead = `${ai}% was classified as AI-like.`;
+  else if (uncertain >= 25) lead = `None of it was classified as clearly AI-like. ${uncertain}% was inconclusive.`;
+  else if (uncertain > 0) lead = `None of it was classified as clearly AI-like. ${uncertain}% was inconclusive.`;
+  return `${lead} Breakdown: ${ai}% AI-like, ${uncertain}% inconclusive, ${human}% human-like. That is an estimate and does not establish whether the text was written by AI.`;
 }
 
-let gaugeSerial = 0;
-
 function drawGauge(host, reading, caption) {
-  const cx = 240;
-  const cy = 168;
-  const radius = 112;
-  const width = 28;
-  const value = Math.max(0, Math.min(100, reading.ai));
-  const color = speedColor(value);
-  const start = Math.PI;
-  const end = Math.PI + Math.PI * (value / 100);
-  const track = gaugeArc(cx, cy, radius, start, start + Math.PI);
-  const fill = gaugeArc(cx, cy, radius, start, end);
-  const gradientId = `speed-${++gaugeSerial}`;
-  const [leftX] = gaugePoint(cx, cy, radius, Math.PI);
-  const [rightX] = gaugePoint(cx, cy, radius, 0);
-  const ticks = [0, 25, 50, 75, 100].map((mark) => {
-    const angle = Math.PI + Math.PI * (mark / 100);
-    const [x0, y0] = gaugePoint(cx, cy, radius + width / 2 + 4, angle);
-    const [x1, y1] = gaugePoint(cx, cy, radius + width / 2 + 12, angle);
-    return `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="#8b97a3" stroke-width="1.5"></line>`;
+  if (!host) return;
+  const human = reading.human;
+  const mid = reading.uncertain;
+  const ai = reading.ai;
+  const cx = 150;
+  const cy = 150;
+  const radius = 108;
+  const width = 34;
+  const parts = [
+    { value: human, color: "#1f9d57", label: "Human-like" },
+    { value: mid, color: "#6b5b8a", label: "Inconclusive" },
+    { value: ai, color: "#c9342e", label: "AI-like" },
+  ];
+  let cursor = 0;
+  const arcs = parts.map((part) => {
+    const start = cursor;
+    cursor += part.value;
+    if (part.value <= 0) return "";
+    const begin = Math.PI * 2 * (start / 100) - Math.PI / 2;
+    const end = Math.PI * 2 * (cursor / 100) - Math.PI / 2;
+    if (part.value >= 99.5) {
+      return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${part.color}" stroke-width="${width}"></circle>`;
+    }
+    const [x0, y0] = gaugePoint(cx, cy, radius, begin);
+    const [x1, y1] = gaugePoint(cx, cy, radius, end);
+    const large = part.value > 50 ? 1 : 0;
+    return `<path d="M ${x0} ${y0} A ${radius} ${radius} 0 ${large} 1 ${x1} ${y1}" fill="none" stroke="${part.color}" stroke-width="${width}" stroke-linecap="butt"></path>`;
   }).join("");
-  const [sx, sy] = gaugePoint(cx, cy, 18, end);
-  const [nx, ny] = gaugePoint(cx, cy, radius - width / 2 - 8, end);
-  host.innerHTML = `<svg viewBox="0 0 480 300" role="img" aria-label="${value}% AI-like, ${reading.uncertain}% inconclusive">
-    <defs>
-      <linearGradient id="${gradientId}" x1="${leftX}" y1="${cy}" x2="${rightX}" y2="${cy}" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#1f9d57"></stop>
-        <stop offset="28%" stop-color="#8fbe2f"></stop>
-        <stop offset="52%" stop-color="#e2a30a"></stop>
-        <stop offset="76%" stop-color="#e15c22"></stop>
-        <stop offset="100%" stop-color="#d6453d"></stop>
-      </linearGradient>
-    </defs>
-    <path d="${track}" fill="none" stroke="#e6edf3" stroke-width="${width}" stroke-linecap="butt"></path>
-    ${fill ? `<path d="${fill}" fill="none" stroke="url(#${gradientId})" stroke-width="${width}" stroke-linecap="butt"></path>` : ""}
-    ${ticks}
-    <line x1="${sx}" y1="${sy}" x2="${nx}" y2="${ny}" stroke="#172033" stroke-width="2.5"></line>
-    <circle cx="${cx}" cy="${cy}" r="6" fill="#172033"></circle>
-    <text x="${cx}" y="${cy + 42}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="46" font-weight="650" fill="${color}">${value}</text>
-    <text x="${cx}" y="${cy + 62}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="13" fill="#5c6b7a">${caption}</text>
-    <text x="${cx - radius}" y="${cy + 22}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="13" fill="#5c6b7a">0</text>
-    <text x="${cx + radius}" y="${cy + 22}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="13" fill="#5c6b7a">100</text>
-    <text x="120" y="268" text-anchor="middle" font-family="Outfit, sans-serif" font-size="22" font-weight="650" fill="#172033">${reading.human}%</text>
-    <text x="120" y="288" text-anchor="middle" font-family="Outfit, sans-serif" font-size="12" fill="#5c6b7a">Human-like</text>
-    <text x="360" y="268" text-anchor="middle" font-family="Outfit, sans-serif" font-size="22" font-weight="650" fill="#6b5b8a">${reading.uncertain}%</text>
-    <text x="360" y="288" text-anchor="middle" font-family="Outfit, sans-serif" font-size="12" fill="#5c6b7a">Inconclusive</text>
+  const centerColor = speedColor(ai);
+  host.innerHTML = `<svg viewBox="0 0 300 300" role="img" aria-label="${ai}% AI-like, ${mid}% inconclusive, ${human}% human-like">
+    <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#e6edf3" stroke-width="${width}"></circle>
+    ${arcs}
+    <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="52" font-weight="650" fill="${centerColor}">${ai}%</text>
+    <text x="${cx}" y="${cy + 22}" text-anchor="middle" font-family="Outfit, sans-serif" font-size="15" fill="#5c6b7a">${caption || "AI-like"}</text>
   </svg>`;
 }
 
@@ -316,11 +313,35 @@ function paintPassage(host, source, sentences) {
   if (cursor < text.length) host.append(document.createTextNode(text.slice(cursor)));
 }
 
+function fillScoreBreakdown(reading) {
+  const list = document.querySelector("#score-breakdown");
+  if (!list) return;
+  const rows = [
+    ["AI-like", reading.ai, "#c9342e"],
+    ["Inconclusive", reading.uncertain, "#6b5b8a"],
+    ["Human-like", reading.human, "#1f9d57"],
+  ];
+  list.replaceChildren();
+  for (const [name, value, color] of rows) {
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    const dot = document.createElement("span");
+    dot.className = "share-dot";
+    dot.style.background = color;
+    label.append(dot, document.createTextNode(` ${name}`));
+    const strong = document.createElement("strong");
+    strong.textContent = `${value}%`;
+    item.append(label, strong);
+    list.appendChild(item);
+  }
+}
+
 function showReport(result) {
   lastCheck = result;
   const reading = readingOf(result.flagged_percent, result.uncertain_percent);
   drawGauge(document.querySelector("#donut"), reading, "AI-like");
   document.querySelector("#donut-blurb").textContent = `${explainReading(reading)} Confidence is ${result.confidence}.`;
+  fillScoreBreakdown(reading);
   const confidenceLine = document.querySelector("#confidence-line");
   if (confidenceLine) confidenceLine.textContent = "";
   fillReading(reading, result.confidence, result.word_count, "check");
@@ -341,6 +362,7 @@ function showReport(result) {
     paintPassage(essay, typed, result.sentences || []);
   }
   if (rewriteBody) rewriteBody.hidden = true;
+  if (similarityBody) similarityBody.hidden = true;
   if (reportEmpty) reportEmpty.hidden = true;
   if (reportBody) reportBody.hidden = false;
   const scoreMore = document.querySelector("#score-more");
@@ -360,15 +382,10 @@ function showReport(result) {
 
 function showRewrite(result) {
   lastRewrite = result;
-  const before = readingOf(result.before_flagged, result.before_uncertain);
-  const after = readingOf(result.after_flagged, result.after_uncertain);
-  drawGauge(document.querySelector("#before-donut"), before, "before");
-  drawGauge(document.querySelector("#after-donut"), after, "after");
-  document.querySelector("#pair-blurb").textContent = `Before: ${explainReading(before)} After: ${explainReading(after)}`;
   const rewrite = document.querySelector("#rewrite");
-  if (rewrite) rewrite.textContent = result.text;
-  fillReading(after, "", result.word_count, "rewrite");
+  if (rewrite) rewrite.textContent = result.text || "";
   if (reportBody) reportBody.hidden = true;
+  if (similarityBody) similarityBody.hidden = true;
   if (reportEmpty) reportEmpty.hidden = true;
   if (rewriteBody) rewriteBody.hidden = false;
   const scoreMore = document.querySelector("#score-more");
@@ -378,6 +395,10 @@ function showRewrite(result) {
   if (reportScore) reportScore.hidden = true;
   if (rewriteScore) rewriteScore.hidden = false;
   if (offerHumanize) offerHumanize.hidden = true;
+  const pairBlurb = document.querySelector("#pair-blurb");
+  if (pairBlurb) {
+    pairBlurb.textContent = "Here is the rewritten draft. Use Check this rewrite if you want an AI reading of it.";
+  }
   const marked = document.querySelector("#marked-text");
   const rewriteText = document.querySelector("#rewrite-text");
   if (marked) marked.hidden = true;
@@ -461,13 +482,118 @@ function clearBusyLabel(button) {
 
 function buttonsAvailable() {
   const busy = (checkButton && checkButton.classList.contains("is-busy"))
-    || (humanizeButton && humanizeButton.classList.contains("is-busy"));
+    || (humanizeButton && humanizeButton.classList.contains("is-busy"))
+    || (similarityButton && similarityButton.classList.contains("is-busy"));
   if (busy) return;
   const count = draft ? words(draft.value) : 0;
   const hasFile = Boolean(fileInput && fileInput.files && fileInput.files.length > 0);
   if (checkButton) checkButton.disabled = !detectorReady || (count < 20 && !hasFile);
   if (humanizeButton) humanizeButton.disabled = !humanizerReady || count < 8;
+  if (similarityButton) similarityButton.disabled = !similarityReady || (count < 40 && !hasFile);
   if (offerHumanize) offerHumanize.disabled = !humanizerReady;
+}
+
+function showSimilarity(result) {
+  lastSimilarity = result;
+  const headline = document.querySelector("#similarity-headline");
+  const note = document.querySelector("#similarity-note");
+  const warnings = document.querySelector("#similarity-warnings");
+  const sources = document.querySelector("#similarity-sources");
+  const matches = document.querySelector("#similarity-matches");
+  const download = document.querySelector("#similarity-download");
+  if (headline) {
+    headline.textContent = `${Number(result.overall_percent || 0)}% similar to public web pages`;
+  }
+  if (note) {
+    note.textContent = result.disclaimer
+      || "This estimate comes from public web pages found for this draft. It is not a finding of misconduct.";
+  }
+  if (warnings) {
+    warnings.replaceChildren();
+    for (const warning of result.warnings || []) {
+      const item = document.createElement("li");
+      item.textContent = warning;
+      warnings.appendChild(item);
+    }
+  }
+  if (sources) {
+    sources.replaceChildren();
+    const rows = result.sources || [];
+    if (!rows.length) {
+      const item = document.createElement("li");
+      item.textContent = "No public sources matched.";
+      sources.appendChild(item);
+    } else {
+      rows.forEach((row) => {
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = row.url || "#";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = row.title || row.host || row.url || "Source";
+        const meta = document.createElement("span");
+        const host = row.host || "";
+        const share = `${Number(row.share || 0)}%`;
+        meta.textContent = host ? ` · ${host} · ${share}` : ` · ${share}`;
+        item.append(link, meta);
+        sources.appendChild(item);
+      });
+    }
+  }
+  if (matches) {
+    matches.replaceChildren();
+    const rows = result.matches || [];
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "similarity-empty";
+      empty.textContent = "No close excerpts were kept.";
+      matches.appendChild(empty);
+    } else {
+      rows.slice(0, 20).forEach((row) => {
+        const card = document.createElement("article");
+        card.className = "similarity-match";
+        const head = document.createElement("p");
+        head.className = "similarity-match-head";
+        const link = document.createElement("a");
+        link.href = row.url || "#";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = row.title || row.url || "Source";
+        head.append(
+          document.createTextNode(`${Math.round(100 * Number(row.score || 0))}% · `),
+          link,
+        );
+        const draftLine = document.createElement("p");
+        draftLine.textContent = `Your draft: ${row.draft_excerpt || ""}`;
+        const sourceLine = document.createElement("p");
+        sourceLine.textContent = `Source text: ${row.source_excerpt || ""}`;
+        card.append(head, draftLine, sourceLine);
+        matches.appendChild(card);
+      });
+    }
+  }
+  if (download) {
+    // Full report / download is only for PDF uploads, not pasted text.
+    if (result.review_url) {
+      download.hidden = false;
+      download.href = appPath(result.review_url);
+      const label = download.querySelector(".btn-label");
+      if (label) label.textContent = "Open full report";
+      download.target = "_blank";
+      download.rel = "noopener noreferrer";
+    } else {
+      download.hidden = true;
+      download.removeAttribute("href");
+      download.removeAttribute("target");
+    }
+  }
+  if (reportBody) reportBody.hidden = true;
+  if (rewriteBody) rewriteBody.hidden = true;
+  if (reportEmpty) reportEmpty.hidden = true;
+  if (similarityBody) similarityBody.hidden = false;
+  const scoreMore = document.querySelector("#score-more");
+  if (scoreMore) scoreMore.hidden = true;
+  if (similarityBody) similarityBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 async function readStatus(path) {
@@ -479,33 +605,57 @@ async function readStatus(path) {
 async function pollReady() {
   const detector = await readStatus("/api/status");
   let human = { status: "loading", error: null };
+  let similar = { status: "loading", error: null };
   try {
     human = await readStatus("/api/humanize/status");
   } catch (error) {
     human = { status: "loading", error: null };
   }
+  try {
+    similar = await readStatus("/api/similarity/status");
+  } catch (error) {
+    similar = { status: "loading", error: null };
+  }
   detectorReady = detector.status === "ready";
   humanizerReady = human.status === "ready";
+  similarityReady = similar.status === "ready";
   if (detector.error && !detectorReady) {
     modelState.textContent = detector.error;
   } else if (detector.status === "error") {
     modelState.textContent = detector.error || "Flyleaf failed to load.";
-  } else if (human.status === "error" && detectorReady) {
-    modelState.textContent = "Check for AI is ready. The humanizer failed to load.";
-  } else if (detectorReady && humanizerReady) {
+  } else if (detectorReady && human.status === "error" && similar.status === "error") {
+    modelState.textContent = "Check for AI is ready. Humanize and Similarity could not load.";
+  } else if (detectorReady && human.status === "error") {
+    modelState.textContent = similarityReady
+      ? "Check for AI and Similarity are ready. The humanizer failed to load."
+      : "Check for AI is ready. The humanizer failed to load.";
+  } else if (detectorReady && similar.status === "error") {
+    modelState.textContent = humanizerReady
+      ? "Check for AI and Humanize are ready. Similarity failed to load."
+      : "Check for AI is ready. Similarity failed to load.";
+  } else if (detectorReady && humanizerReady && similarityReady) {
     modelState.textContent = "Ready · English · free to use";
+  } else if (detectorReady) {
+    modelState.textContent = "Check for AI is ready. Other tools are still loading...";
   } else {
     modelState.textContent = "Flyleaf is getting ready...";
   }
   buttonsAvailable();
-  return detectorReady && humanizerReady;
+  return detectorReady;
 }
 
 async function waitUntilReady() {
   for (;;) {
     try {
       const settled = await pollReady();
-      if (settled) return;
+      if (settled) {
+        if ((!humanizerReady || !similarityReady) && !secondaryPoll) {
+          secondaryPoll = window.setInterval(() => {
+            pollReady().catch(() => {});
+          }, 4000);
+        }
+        return;
+      }
     } catch (error) {
       modelState.textContent = "Flyleaf could not reach the checker.";
     }
@@ -516,11 +666,13 @@ async function waitUntilReady() {
 async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyButton) {
   checkButton.disabled = true;
   humanizeButton.disabled = true;
+  if (similarityButton) similarityButton.disabled = true;
   if (offerHumanize) offerHumanize.disabled = true;
   setBusyLabel(busyButton, "Processing");
   if (reportEmpty) reportEmpty.hidden = true;
   if (reportBody) reportBody.hidden = true;
   if (rewriteBody) rewriteBody.hidden = true;
+  if (similarityBody) similarityBody.hidden = true;
   const scoreMore = document.querySelector("#score-more");
   if (scoreMore) scoreMore.hidden = true;
   const readingMore = document.querySelector("#reading-more");
@@ -530,14 +682,17 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyBu
   if (marked) marked.hidden = true;
   if (rewriteText) rewriteText.hidden = true;
   progress.hidden = false;
-  let shown = 4;
-  let target = 8;
+  // Match server job start (6%) so the bar never climbs past the job then snaps back.
+  let shown = 6;
+  let target = 6;
   let finished = false;
   paintProgress(shown, workingLabel);
   const timer = window.setInterval(() => {
-    const ceiling = finished ? 100 : 90;
-    target = Math.min(ceiling, target);
-    shown += (target - shown) * 0.12;
+    const ceiling = finished ? 100 : 94;
+    if (target > ceiling) target = ceiling;
+    // Ease forward only so the bar never jumps backward.
+    if (target > shown) shown += Math.max(0.15, (target - shown) * 0.14);
+    else if (finished && shown < 100) shown += Math.max(0.4, (100 - shown) * 0.2);
     paintProgress(shown, finished ? doneLabel : workingLabel);
   }, 80);
 
@@ -577,7 +732,10 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyBu
       if (Date.now() - started > 900000) {
         throw new Error("This reading is still going. Leave the page open a little longer.");
       }
-      if (typeof job.percent === "number") target = Math.max(6, job.percent);
+      if (typeof job.percent === "number") {
+        // Keep progress monotonic: never let a later poll pull the bar back down.
+        target = Math.max(target, Math.min(94, job.percent));
+      }
       if (job.status === "done") {
         finished = true;
         target = 100;
@@ -594,17 +752,43 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyBu
     progress.hidden = true;
     clearBusyLabel(checkButton);
     clearBusyLabel(humanizeButton);
+    clearBusyLabel(similarityButton);
     clearBusyLabel(offerHumanize);
-    if (reportEmpty && reportBody && rewriteBody && reportBody.hidden && rewriteBody.hidden) {
+    if (
+      reportEmpty
+      && reportBody
+      && rewriteBody
+      && reportBody.hidden
+      && rewriteBody.hidden
+      && (!similarityBody || similarityBody.hidden)
+    ) {
       reportEmpty.hidden = false;
     }
     buttonsAvailable();
   }
 }
 
+async function assertPdfUploadAllowed() {
+  try {
+    const response = await fetch(appPath("/api/upload-quota"), { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (!payload.allowed) {
+      window.alert(payload.error || "PDF uploads are not available right now.");
+      return false;
+    }
+    return true;
+  } catch (error) {
+    window.alert("Flyleaf could not check the upload allowance.");
+    return false;
+  }
+}
+
 if (draft) {
-checkButton.addEventListener("click", () => {
+checkButton.addEventListener("click", async () => {
   if (selectedPdf() || (fileInput.files.length > 0 && words(draft.value) < 20)) {
+    if (selectedPdf() || (fileInput.files[0] && fileInput.files[0].name.toLowerCase().endsWith(".pdf"))) {
+      if (!(await assertPdfUploadAllowed())) return;
+    }
     const form = new FormData();
     form.append("file", fileInput.files[0]);
     runJob(appPath("/api/analyze"), form, true, "Reviewing the draft", "Opening the review", (result) => {
@@ -619,8 +803,7 @@ checkButton.addEventListener("click", () => {
       };
       if (chosen && result.review_id && document.body.dataset.signedIn === "1") {
         keepUpload(chosen.name, result).then(openReview).catch((error) => {
-          window.alert(error.message);
-          openReview();
+          window.alert(error.message || "That PDF could not be kept.");
         });
         return;
       }
@@ -679,19 +862,25 @@ function showChosenFile(file) {
 }
 
 function setPasteMode(mode) {
-  const checking = mode !== "humanize";
+  pasteMode = mode;
   const modeCheck = document.querySelector("#mode-check");
   const modeHumanize = document.querySelector("#mode-humanize");
+  const modeSimilarity = document.querySelector("#mode-similarity");
   if (modeCheck) {
-    modeCheck.classList.toggle("is-selected", checking);
-    modeCheck.setAttribute("aria-pressed", checking ? "true" : "false");
+    modeCheck.classList.toggle("is-selected", mode === "check");
+    modeCheck.setAttribute("aria-pressed", mode === "check" ? "true" : "false");
   }
   if (modeHumanize) {
-    modeHumanize.classList.toggle("is-selected", !checking);
-    modeHumanize.setAttribute("aria-pressed", checking ? "false" : "true");
+    modeHumanize.classList.toggle("is-selected", mode === "humanize");
+    modeHumanize.setAttribute("aria-pressed", mode === "humanize" ? "true" : "false");
   }
-  if (checkButton) checkButton.hidden = !checking;
-  if (humanizeButton) humanizeButton.hidden = checking;
+  if (modeSimilarity) {
+    modeSimilarity.classList.toggle("is-selected", mode === "similarity");
+    modeSimilarity.setAttribute("aria-pressed", mode === "similarity" ? "true" : "false");
+  }
+  if (checkButton) checkButton.hidden = mode !== "check";
+  if (humanizeButton) humanizeButton.hidden = mode !== "humanize";
+  if (similarityButton) similarityButton.hidden = mode !== "similarity";
 }
 
 fileInput.addEventListener("change", async () => {
@@ -753,17 +942,100 @@ document.querySelector("#sample-ai").addEventListener("click", () => {
   refreshCount();
 });
 
+async function startSimilarity(busyButton) {
+  if (words(draft.value) < 40 && !(fileInput.files && fileInput.files.length)) {
+    window.alert("Paste a short paragraph for a similarity check.");
+    return;
+  }
+  if (selectedPdf() || (fileInput.files.length > 0 && words(draft.value) < 40)) {
+    if (selectedPdf() || (fileInput.files[0] && fileInput.files[0].name.toLowerCase().endsWith(".pdf"))) {
+      if (!(await assertPdfUploadAllowed())) return;
+    }
+    const form = new FormData();
+    form.append("file", fileInput.files[0]);
+    const openPdfReport = selectedPdf();
+    runJob(
+      appPath("/api/plagiarism"),
+      form,
+      true,
+      "Searching public pages",
+      openPdfReport ? "Opening the report" : "Similarity ready",
+      (result) => {
+        if (!openPdfReport) {
+          showSimilarity(result);
+          return;
+        }
+        const chosen = fileInput.files[0];
+        const openReview = () => {
+          if (result.review_url) {
+            const opened = window.open(appPath(result.review_url), "_blank");
+            if (!opened) window.location = appPath(result.review_url);
+            return;
+          }
+          showSimilarity(result);
+        };
+        if (chosen && result.review_id && document.body.dataset.signedIn === "1") {
+          keepUpload(chosen.name, result).then(openReview).catch((error) => {
+            window.alert(error.message || "That PDF could not be kept.");
+          });
+          return;
+        }
+        openReview();
+      },
+      busyButton,
+    );
+    return;
+  }
+  const textBody = new URLSearchParams();
+  textBody.set("text", draft.value);
+  runJob(
+    appPath("/api/plagiarism"),
+    textBody,
+    true,
+    "Searching public pages",
+    "Similarity ready",
+    showSimilarity,
+    busyButton,
+  );
+}
+
+if (similarityButton) {
+  similarityButton.addEventListener("click", () => startSimilarity(similarityButton));
+}
+
 draft.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-    const active = humanizeButton && !humanizeButton.hidden ? humanizeButton : checkButton;
+    const active = !checkButton.hidden
+      ? checkButton
+      : !humanizeButton.hidden
+        ? humanizeButton
+        : similarityButton;
     if (active && !active.disabled) active.click();
   }
 });
 
 const modeCheck = document.querySelector("#mode-check");
 const modeHumanize = document.querySelector("#mode-humanize");
+const modeSimilarity = document.querySelector("#mode-similarity");
 if (modeCheck) modeCheck.addEventListener("click", () => setPasteMode("check"));
 if (modeHumanize) modeHumanize.addEventListener("click", () => setPasteMode("humanize"));
+if (modeSimilarity) modeSimilarity.addEventListener("click", () => setPasteMode("similarity"));
+
+function modeFromHash() {
+  const hash = (location.hash || "").replace(/^#/, "").toLowerCase();
+  if (hash === "humanize") return "humanize";
+  if (hash === "similarity" || hash === "plagiarism") return "similarity";
+  if (hash === "check" || hash === "upload") return "check";
+  return null;
+}
+
+function applyHashMode() {
+  const mode = modeFromHash();
+  if (mode) setPasteMode(mode);
+}
+
+applyHashMode();
+window.addEventListener("hashchange", applyHashMode);
 
 const clearDraft = document.querySelector("#clear-draft");
 if (clearDraft) {

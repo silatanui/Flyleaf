@@ -3,7 +3,7 @@
 {% block body_class %}app-shell{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/dataTables.dataTables.min.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=4">
 {% endblock %}
 {% block body %}
 <div class="app-frame">
@@ -13,9 +13,8 @@
       <div>
         <p class="eyebrow">Your documents</p>
         <h1>Documents</h1>
-        <p>Upload a PDF. Flyleaf keeps the report here, newest first. Pasted text stays on the checker.</p>
       </div>
-      {% if uploads_left > 0 %}
+      {% if uploads_unlimited or (uploads_left and uploads_left > 0) %}
       <label class="button app-upload" for="doc-file">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8 8 4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         Upload a file

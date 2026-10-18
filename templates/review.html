@@ -4,7 +4,11 @@
 <div class="review-bar">
   <div class="review-bar-inner">
     <p class="review-file">{{ summary.filename }}</p>
+    {% if summary.kind == "similarity" %}
+    <p class="review-score">{{ summary.overall_percent }}% similar to public pages · {{ summary.source_count }} sources</p>
+    {% else %}
     <p class="review-score">{{ summary.flagged_percent }}% AI-like · {{ summary.uncertain_percent }}% inconclusive</p>
+    {% endif %}
     {% if saved_id %}
     <span class="review-saved">Saved</span>
     {% elif account %}

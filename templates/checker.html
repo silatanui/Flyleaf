@@ -6,11 +6,16 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4v2M12 16v2M5 11H3M21 11h-2M7 6.5 5.6 5.1M18.4 5.1 17 6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         Check for AI
       </button>
+      <button id="mode-similarity" type="button" class="mode-option" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h6v6H9z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 7 5 5M17 7l2-2M7 17l-2 2M17 17l2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Similarity
+      </button>
       <button id="mode-humanize" type="button" class="mode-option" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.5 8 8l3 5 2-3 2 3 1.5-2.2L19 16.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         Humanize
       </button>
-      <label class="mode-option" id="upload">
+      <span class="mode-split" aria-hidden="true"></span>
+      <label class="mode-option mode-upload" id="upload">
         <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m8.5 9 3.5-3.5L15.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 18h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <span id="upload-label">Upload</span>
@@ -50,6 +55,13 @@
           </svg>
           <span class="btn-label">Humanize</span>
         </button>
+        <button id="run-similarity" type="button" class="with-icon paste-go" hidden disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 9h6v6H9z" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+            <path d="M7 7 5 5M17 7l2-2M7 17l-2 2M17 17l2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+          <span class="btn-label">Compare</span>
+        </button>
       </div>
     </section>
 
@@ -58,17 +70,17 @@
       <div id="report-empty" class="result-sheet">Results will be shown here.</div>
 
       <div id="progress" class="side-progress" hidden>
-        <p class="side-progress-title">
-          <span class="process-mark" aria-hidden="true"></span>
-          Processing
-        </p>
+        <div class="loader-orb" aria-hidden="true">
+          <span class="loader-ring"></span>
+          <span class="loader-ring loader-ring-soft"></span>
+          <strong id="progress-pct">0%</strong>
+        </div>
+        <p class="side-progress-title">Processing</p>
+        <p id="progress-label" class="loader-status">Reviewing the draft</p>
         <div class="bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
           <div id="progress-bar" class="bar-fill"></div>
         </div>
-        <div class="bar-meta">
-          <span id="progress-label">Reviewing the draft</span>
-          <strong id="progress-pct">0%</strong>
-        </div>
+        <p class="progress-hint">Stay on this page while Flyleaf finishes the reading.</p>
       </div>
 
       <div id="report-body" hidden>
@@ -91,6 +103,28 @@
           <article id="rewrite" class="essay"></article>
         </div>
       </div>
+
+      <div id="similarity-body" hidden>
+        <div class="similarity-sheet result-sheet">
+          <p id="similarity-headline" class="similarity-headline"></p>
+          <p id="similarity-note" class="similarity-note"></p>
+          <ul id="similarity-warnings" class="warnings"></ul>
+          <h3 class="similarity-sub">Sources</h3>
+          <ol id="similarity-sources" class="similarity-sources"></ol>
+          <h3 class="similarity-sub">Matched text</h3>
+          <div id="similarity-matches" class="similarity-matches"></div>
+          <div class="highlight-foot">
+            <a id="similarity-download" class="with-icon offer-humanize" hidden href="#">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                <path d="m8 10 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M5 18h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+              </svg>
+              <span class="btn-label">Download report</span>
+            </a>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -101,6 +135,7 @@
       </div>
       <div class="score-copy">
         <p id="donut-blurb" class="donut-blurb"></p>
+        <ul id="score-breakdown" class="score-breakdown" aria-label="Score breakdown"></ul>
         <ul id="warnings" class="warnings"></ul>
         <div class="legend">
           <span class="swatch human">Human-like</span>
@@ -109,20 +144,14 @@
         </div>
       </div>
     </div>
-    <div id="rewrite-score" class="panel score-card" hidden>
-      <div class="score-slot">
-        <div class="donut-pair">
-          <div id="before-donut" class="donut"></div>
-          <div id="after-donut" class="donut"></div>
-        </div>
-      </div>
+    <div id="rewrite-score" class="panel score-card rewrite-only" hidden>
       <div class="score-copy">
-        <p id="pair-blurb" class="donut-blurb"></p>
+        <p id="pair-blurb" class="donut-blurb">Here is the rewritten draft.</p>
         <div class="actions">
           <button id="copy" type="button" class="ghost">Copy</button>
           <button id="check-rewrite" type="button" class="ghost">Check this rewrite</button>
         </div>
-        <p class="footnote">A lower AI-like number means less of the rewrite was classified as AI-like. The draft still needs a human review.</p>
+        <p class="footnote">Humanize returns a plainer draft only. It does not score the result. Use Check this rewrite if you want an AI reading.</p>
       </div>
     </div>
   </section>

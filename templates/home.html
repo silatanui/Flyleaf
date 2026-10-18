@@ -1,19 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Flyleaf, writing review{% endblock %}
+{% block title %}Flyleaf | Free AI Detector, Plagiarism Checker &amp; Humanizer{% endblock %}
+{% block meta_description %}Flyleaf is a free AI checker, plagiarism checker, and AI humanizer for drafts. Paste or upload a file for a careful first look before anyone treats a percentage like a verdict.{% endblock %}
+{% block body_class %}page-home{% endblock %}
 {% block body %}
 <div class="detect-band">
-<section class="home-lead">
-  <h1><span class="lead-accent">Free draft review</span><br> for the whole piece</h1>
-  <p>Paste English prose or upload a file. Flyleaf marks the share classified as AI-like and keeps inconclusive lines separate. The result is an estimate. It does not establish that a text was written by AI.</p>
-</section>
-{% include "checker.html" %}
+  <div class="detect-band-inner">
+    <section class="home-lead">
+      <p class="hero-kicker">Flyleaf</p>
+      <h1><span class="lead-accent">Free AI detector</span><br> plagiarism check, and humanizer</h1>
+      <p>Paste a draft or upload a file. Flyleaf marks the share classified as AI-like, checks public-web similarity, and can return a plainer draft. The result is an estimate. It does not establish that a text was written by AI.</p>
+    </section>
+    <div class="hero-panel">
+      {% include "checker.html" %}
+    </div>
+  </div>
 </div>
 <main class="home">
   <section class="offer" aria-label="What Flyleaf does">
     <article>
       <p>01</p>
       <h2>Check for AI</h2>
-      <p>The gauge sits under the draft. The needle is the share classified as AI-like. The arc fades from green to red as that share rises.</p>
+      <p>The pie under the draft shows AI-like, inconclusive, and human-like shares. The center number is the AI-like share only.</p>
     </article>
     <article>
       <p>02</p>
@@ -27,21 +34,36 @@
     </article>
     <article>
       <p>04</p>
-      <h2>Highlights you can see</h2>
-      <p>Cyan marks lines classified as AI-like. Purple marks inconclusive lines. Those lines are listed beside the headline, not added into it.</p>
+      <h2>Public web similarity</h2>
+      <p>Compare the draft with public pages found for it, then download a short report. A match is a reason to cite or rewrite, not a finding of misconduct.</p>
     </article>
   </section>
 
   <section class="sample-report" id="pdf-report">
-    <div>
+    <div class="sample-report-copy">
       <p class="eyebrow">A PDF report</p>
       <h2>Upload a PDF, and keep the marked pages.</h2>
-      <p>Pasted text stays on this page. A text-based PDF opens as a report: a cover, an overview, then the original pages. Sign in to keep that report with your account. Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive.</p>
+      <p>Pasted text stays on this page. A text-based PDF opens as a report: a cover with the headline score, an overview of the groups, then the original pages with marks on the lines. Sign in to keep that report with your account. Cyan marks lines classified as AI-like. Purple marks lines that were inconclusive.</p>
+      <ul class="sample-report-points">
+        <li>Cover with AI-like share and document details</li>
+        <li>Overview of AI-like and inconclusive groups</li>
+        <li>Original pages kept, with marks on the lines</li>
+      </ul>
       <a class="button" href="#check">Upload a PDF</a>
     </div>
-    <figure class="report-sheets">
-      <img src="{{ url_for('static', filename='images/sample-report-cover.png') }}" alt="Sample Flyleaf report cover for a PDF named Sample-draft">
-      <img src="{{ url_for('static', filename='images/sample-report-page.png') }}" alt="Sample report page with cyan and purple highlights on the original text">
+    <figure class="report-sheets" aria-label="Sample Flyleaf PDF report pages">
+      <div class="report-sheet">
+        <img src="{{ url_for('static', filename='images/sample-report-cover.png') }}?v=2" alt="Sample Flyleaf report cover showing the AI-like share and document details">
+        <figcaption>Cover</figcaption>
+      </div>
+      <div class="report-sheet is-focus">
+        <img src="{{ url_for('static', filename='images/sample-report-overview.png') }}?v=2" alt="Sample overview page explaining AI-like and inconclusive groups">
+        <figcaption>Overview</figcaption>
+      </div>
+      <div class="report-sheet">
+        <img src="{{ url_for('static', filename='images/sample-report-page.png') }}?v=2" alt="Sample submission page with cyan and purple highlights on the original draft">
+        <figcaption>Marked page</figcaption>
+      </div>
     </figure>
   </section>
 
@@ -64,7 +86,7 @@
           <span>02</span>
           <div>
             <h3>Read the result</h3>
-            <p>The needle is the share classified as AI-like. The sentence under it also gives the inconclusive share, kept separate.</p>
+            <p>The pie is the share classified as AI-like, with inconclusive and human-like kept separate beside it.</p>
           </div>
         </li>
         <li>
@@ -78,55 +100,141 @@
     </div>
   </section>
 
-  <section class="cards-section" id="scores">
-    <p class="eyebrow">How to read a score</p>
-    <h2>A headline, and a separate note.</h2>
-    <div class="cards">
-      <article class="card">
+  <section class="guide-section" id="scores">
+    <div class="guide-intro">
+      <p class="eyebrow">How to read a score</p>
+      <h2>A headline, and a separate note.</h2>
+      <p class="lede">Three cues sit beside the draft. Only one of them is the percentage in the center of the pie.</p>
+    </div>
+    <div class="guide-grid">
+      <article class="guide-item">
+        <span class="guide-mark ai" aria-hidden="true"></span>
         <h3>AI-like</h3>
         <p>The number on the gauge. Only lines classified as AI-like. Inconclusive lines are not added in.</p>
       </article>
-      <article class="card">
+      <article class="guide-item">
+        <span class="guide-mark uncertain" aria-hidden="true"></span>
         <h3>Inconclusive</h3>
         <p>A separate note beside the headline. Purple highlights are a reason to reread, not part of the AI-like score.</p>
       </article>
-      <article class="card">
+      <article class="guide-item">
+        <span class="guide-mark human" aria-hidden="true"></span>
         <h3>Confidence</h3>
         <p>Lower on short text, on mixed sections, and on writing that may not be English. Under 300 words, treat the result as a sketch.</p>
       </article>
     </div>
   </section>
 
-  <section class="cards-section" id="people">
-    <p class="eyebrow">Who it is for</p>
-    <h2>A second reading of a draft.</h2>
-    <div class="cards">
-      <article class="card">
-        <h3>Students</h3>
-        <p>Check a draft you are about to submit, and see which lines a reviewer might pause on.</p>
+  <section class="people-section" id="people">
+    <div class="guide-intro">
+      <p class="eyebrow">Who it is for</p>
+      <h2>A second reading of a draft.</h2>
+      <p class="lede">Flyleaf is for a careful look before anyone treats a percentage like a verdict.</p>
+    </div>
+    <div class="people-grid">
+      <article class="people-card">
+        <img src="{{ url_for('static', filename='images/students.jpg') }}" alt="Students working together at a table">
+        <div>
+          <h3>Students</h3>
+          <p>Check a draft you are about to submit, and see which lines a reviewer might pause on.</p>
+        </div>
       </article>
-      <article class="card">
-        <h3>Teachers</h3>
-        <p>Walk into a conversation with the highlighted page, rather than with a single percentage.</p>
+      <article class="people-card">
+        <img src="{{ url_for('static', filename='images/teachers.jpg') }}" alt="Classroom desks ready for a lesson">
+        <div>
+          <h3>Teachers</h3>
+          <p>Walk into a conversation with the highlighted page, rather than with a single percentage.</p>
+        </div>
       </article>
-      <article class="card">
-        <h3>Writers</h3>
-        <p>Look at a passage you edited with a model, and keep the PDF if you want a record of that look.</p>
+      <article class="people-card">
+        <img src="{{ url_for('static', filename='images/writers.jpg') }}" alt="Open notebook and pen on a desk">
+        <div>
+          <h3>Writers</h3>
+          <p>Look at a passage you edited with a model, and keep the PDF if you want a record of that look.</p>
+        </div>
       </article>
+    </div>
+  </section>
+
+  <section class="quotes-band" id="voices">
+    <div class="quotes-section">
+      <div class="quotes-head">
+        <div>
+          <p class="eyebrow">What users say</p>
+          <h2>What users say about our writing review.</h2>
+        </div>
+        <p class="lede">Notes from classmates and early readers who tried a draft with Flyleaf.</p>
+      </div>
+
+      <figure class="quote-feature">
+        <span class="quote-mark" aria-hidden="true">“</span>
+        <blockquote>I used Flyleaf on a lab report before I submitted. The marks helped me see which lines still sounded too smooth to leave alone.</blockquote>
+        <figcaption>
+          <span class="quote-avatar" aria-hidden="true">DK</span>
+          <span class="quote-meta">
+            <span class="quote-name">Dave Kirwa Kabera</span>
+            <span class="quote-role">Classmate</span>
+          </span>
+        </figcaption>
+      </figure>
+
+      <div class="quotes-grid">
+        <figure class="quote-card">
+          <blockquote>As a developer, I like that the PDF keeps the original pages. I can send someone the report without explaining a single percentage.</blockquote>
+          <figcaption>
+            <span class="quote-avatar" aria-hidden="true">BM</span>
+            <span class="quote-meta">
+              <span class="quote-name">Boaz Maina</span>
+              <span class="quote-role">Software Developer</span>
+            </span>
+          </figcaption>
+        </figure>
+        <figure class="quote-card">
+          <blockquote>The similarity check caught a paragraph I had adapted from a blog post. I cited it properly after that.</blockquote>
+          <figcaption>
+            <span class="quote-avatar" aria-hidden="true">AO</span>
+            <span class="quote-meta">
+              <span class="quote-name">Amina Otieno</span>
+              <span class="quote-role">Graduate student</span>
+            </span>
+          </figcaption>
+        </figure>
+        <figure class="quote-card">
+          <blockquote>Humanize gave me a plainer draft I could edit. I still ran the detector afterward, which is exactly what I wanted.</blockquote>
+          <figcaption>
+            <span class="quote-avatar" aria-hidden="true">MC</span>
+            <span class="quote-meta">
+              <span class="quote-name">Marcus Chen</span>
+              <span class="quote-role">Content editor</span>
+            </span>
+          </figcaption>
+        </figure>
+        <figure class="quote-card">
+          <blockquote>Clear layout, honest limits, and no drama. I pointed my tutoring students here for a first pass on their essays.</blockquote>
+          <figcaption>
+            <span class="quote-avatar" aria-hidden="true">LW</span>
+            <span class="quote-meta">
+              <span class="quote-name">Lila Wanjiru</span>
+              <span class="quote-role">Writing tutor</span>
+            </span>
+          </figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
   <section class="cards-section" id="pricing">
     <p class="eyebrow">Plans</p>
-    <h2>Free for now.</h2>
-    <p class="lede">One plan is available. More can be added later. The limit is counted in PDF reports kept with an account.</p>
+    <h2>Free for now. More later.</h2>
+    <p class="lede">Only Free is available today. The monthly plans and the per-PDF top-up below are planned prices. They will be added later. Until then, the free allowance stays at 5 PDF reports kept each day.</p>
     <div class="plan-grid home-plans">
       <article class="plan-card current">
-        <p class="plan-tag">Current plan</p>
+        <p class="plan-tag">Available now</p>
         <h3>Free</h3>
         <p class="plan-price">No charge</p>
         <ul>
-          <li>Checks on this page, with no daily cap</li>
+          <li>Paste and check on this page, with no daily cap</li>
+          <li>Humanize and Similarity on this page</li>
           <li>5 PDF reports kept each day</li>
           <li>View, download, and delete those reports after you sign in</li>
         </ul>
@@ -137,9 +245,40 @@
         {% endif %}
       </article>
       <article class="plan-card later">
-        <p class="plan-tag">Later</p>
-        <h3>More plans</h3>
-        <p>Other plans are not available yet. The free allowance stays at 5 PDF uploads a day until they are.</p>
+        <p class="plan-tag">Coming later</p>
+        <h3>Writer</h3>
+        <p class="plan-price">$7 / month</p>
+        <ul>
+          <li>Everything in Free</li>
+          <li>40 PDF reports kept each month</li>
+          <li>Saved report history on your account</li>
+          <li>Email notice when a long PDF finishes</li>
+        </ul>
+        <p class="plan-note">Not for sale yet. Price may change before launch.</p>
+      </article>
+      <article class="plan-card later">
+        <p class="plan-tag">Coming later</p>
+        <h3>Studio</h3>
+        <p class="plan-price">$16 / month</p>
+        <ul>
+          <li>Everything in Writer</li>
+          <li>150 PDF reports kept each month</li>
+          <li>Larger PDF uploads</li>
+          <li>Batch upload for a small set of files</li>
+        </ul>
+        <p class="plan-note">Not for sale yet. Meant for heavier weekly use.</p>
+      </article>
+      <article class="plan-card later">
+        <p class="plan-tag">Coming later</p>
+        <h3>Extra PDF</h3>
+        <p class="plan-price">$0.45 / PDF</p>
+        <ul>
+          <li>One kept PDF report beyond your plan</li>
+          <li>Same preview and download as a plan report</li>
+          <li>Buy only when you need one more</li>
+          <li>Works with Free, Writer, or Studio later</li>
+        </ul>
+        <p class="plan-note">Pay-per-report top-up. Not available to buy yet.</p>
       </article>
     </div>
   </section>
@@ -163,6 +302,10 @@
       <details>
         <summary>Will a rewrite hide the AI-like lines?</summary>
         <p>No. Humanize is a plainer draft for you to review. The meaning should stay. A later check can still mark the result. Flyleaf does not promise a lower score.</p>
+      </details>
+      <details>
+        <summary>What does Similarity check?</summary>
+        <p>Similarity looks for close matches on public web pages found for this draft, then builds a short PDF report. It does not search publication libraries or student-paper databases. A match is a reason to cite or rewrite. It is not a finding of misconduct.</p>
       </details>
     </div>
   </section>
@@ -192,5 +335,5 @@
 </main>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/app.js') }}?v=32"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=44"></script>
 {% endblock %}

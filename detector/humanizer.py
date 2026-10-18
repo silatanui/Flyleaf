@@ -74,7 +74,7 @@ class Humanizer:
         paragraphs = [part.strip() for part in re.split(r"\n\s*\n", cleaned) if part.strip()]
         grouped = [_pieces(paragraph) for paragraph in paragraphs]
         piece_count = sum(len(group) for group in grouped) or 1
-        steps = piece_count + 2
+        steps = piece_count
         if progress:
             progress(0, steps)
 
@@ -89,22 +89,12 @@ class Humanizer:
                     progress(done, steps)
         body = "\n\n".join(part for part in rewritten if part)
         chosen = body if word_count(body) >= max(8, total_words // 2) else loosen(body)
-        before = _reading(cleaned)
-        if progress:
-            progress(done + 1, steps)
-        after = _reading(chosen)
         if progress:
             progress(steps, steps)
         return {
             "text": chosen,
             "word_count": word_count(chosen),
             "source_words": total_words,
-            "before_percent": before[0],
-            "after_percent": after[0],
-            "before_flagged": before[1],
-            "after_flagged": after[1],
-            "before_uncertain": before[2],
-            "after_uncertain": after[2],
             "model": self.model_name,
         }
 
@@ -161,45 +151,6 @@ def _has_weights(folder: Path, minimum: int) -> bool:
         if path.exists() and path.stat().st_size >= minimum:
             return True
     return False
-
-
-def _reading(text: str) -> tuple[int | None, int | None, int | None]:
-    from detector.engine import detector
-
-    if detector.status != "ready" or word_count(text) < 20:
-        return None, None, None
-    try:
-        result = detector.score(text)
-    except Exception:
-        return None, None, None
-    return (
-        round(result["ai_probability"] * 100),
-        int(result["flagged_percent"]),
-        int(result["uncertain_percent"]),
-    )
-
-
-def _lower_reading(source: str, candidates: list[str], total_words: int) -> tuple[str, tuple[int | None, int | None, int | None]]:
-    floor = max(8, total_words // 2)
-    best_text = ""
-    best_reading: tuple[int | None, int | None, int | None] = (None, None, None)
-    best_score = 101
-    seen: set[str] = set()
-    for candidate in candidates:
-        key = re.sub(r"\s+", " ", candidate).strip()
-        if not key or key in seen or word_count(key) < floor:
-            continue
-        seen.add(key)
-        reading = _reading(key)
-        score = 101 if reading[0] is None else reading[0]
-        if score < best_score:
-            best_score = score
-            best_text = key
-            best_reading = reading
-    if best_text:
-        return best_text, best_reading
-    fallback = next((re.sub(r"\s+", " ", item).strip() for item in candidates if item.strip()), source)
-    return fallback, _reading(fallback)
 
 
 def _choose(source: str, candidates: list[str]) -> str:

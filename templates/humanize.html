@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Humanize a draft, Flyleaf{% endblock %}
+{% block body %}
+<main class="check-main">
+  <div class="workspace">
+    <section class="panel write">
+      <div class="panel-head">
+        <p class="eyebrow">Free for anyone</p>
+        <h1>Humanize a draft</h1>
+        <p>Paste English prose. Flyleaf rewrites stiff, formulaic sentences into plainer ones. The meaning should stay. This does not hide how a draft was written, and a review can still mark the result.</p>
+        <p id="model-state" class="state">Starting…</p>
+      </div>
+      <textarea id="draft" rows="16" placeholder="Paste a paragraph…"></textarea>
+      <div class="toolbar">
+        <span id="word-count" class="count">0 words</span>
+      </div>
+      <div class="actions">
+        <button id="humanize" type="button" disabled>Humanize</button>
+        <button id="sample" type="button" class="ghost">Sample</button>
+      </div>
+    </section>
+
+    <section class="panel report">
+      <div id="result-empty" class="empty-report">
+        <p class="eyebrow">Rewrite</p>
+        <h2>The plainer version lands here</h2>
+        <p>Short drafts finish in a few seconds. A longer page takes longer, because each passage is rewritten on this computer.</p>
+      </div>
+      <div id="result-body" hidden>
+        <div class="meters pair">
+          <div>
+            <p class="meter-label">Likelihood before</p>
+            <p id="before" class="meter">-</p>
+            <p id="before-flagged" class="meter-note">Flagged -</p>
+          </div>
+          <div>
+            <p class="meter-label">Likelihood after</p>
+            <p id="after" class="meter">-</p>
+            <p id="after-flagged" class="meter-note">Flagged -</p>
+          </div>
+        </div>
+        <article id="rewrite" class="essay"></article>
+        <div class="actions">
+          <button id="copy" type="button" class="ghost">Copy</button>
+        </div>
+        <p class="footnote">Likelihood and flagged share use the same review as Check a draft. A lower number is a reason to reread, not a promise that the draft will pass somewhere else.</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="progress" class="progress" hidden>
+  <div class="progress-card">
+    <div class="ring" id="progress-ring">
+      <span id="progress-pct">0%</span>
+    </div>
+    <p id="progress-label">Rewriting the draft</p>
+    <p class="progress-note">Flyleaf is working through the passages.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/humanize.js') }}?v=4"></script>
+{% endblock %}

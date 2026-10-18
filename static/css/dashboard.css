@@ -1,57 +1,72 @@
 .dt-container {
-  color: #1c2430;
+  color: var(--ink);
   font-family: "Outfit", sans-serif;
+  font-size: 13px;
 }
 
 .dt-container .dt-search,
-.dt-container .dt-length {
-  margin: 12px 0;
+.dt-container .dt-length,
+.dt-container .dt-info,
+.dt-container .dt-paging {
+  margin: 8px 0;
+  font-size: 12px;
 }
 
 .dt-container .dt-input {
-  border: 1px solid #dde3e8;
+  border: 1px solid var(--line);
   border-radius: 0;
-  padding: 8px 10px;
-  background: #fff;
-  color: #1c2430;
+  padding: 5px 8px;
+  background: var(--card);
+  color: var(--ink);
   font: inherit;
+  font-size: 12px;
 }
 
 div.dt-container table.dataTable {
   width: 100% !important;
   border-collapse: collapse;
+  font-size: 13px;
 }
 
 div.dt-container table.dataTable thead th {
-  padding: 12px 10px;
-  border-bottom: 1px solid #dde3e8;
-  color: #5c6b78;
-  font-size: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 6%, var(--paper));
 }
 
 div.dt-container table.dataTable tbody td {
-  padding: 12px 10px;
-  border-bottom: 1px solid #dde3e8;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  line-height: 1.35;
+  color: var(--ink);
 }
 
 div.dt-container table.dataTable td.dt-empty {
   text-align: left;
+  padding: 18px 10px;
 }
 
 div.dt-container table.dataTable tbody tr:hover {
-  background: #f7fafc;
+  background: var(--accent-soft);
 }
 
 .dt-paging .dt-paging-button {
   border-radius: 0 !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  color: var(--ink) !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
 }
 
 .dt-paging .dt-paging-button.current {
-  background: #0057b8 !important;
-  border-color: #0057b8 !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
   color: #fff !important;
 }
