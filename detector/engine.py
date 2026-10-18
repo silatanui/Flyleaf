@@ -12,6 +12,10 @@ import threading
 import time
 from pathlib import Path
 
+# The Rust tokenizer builds a thread pool on first use. This host rejects that pool.
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["RAYON_NUM_THREADS"] = "1"
+
 import torch
 import torch.nn as nn
 

@@ -8,6 +8,8 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["RAYON_NUM_THREADS"] = "1"
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
