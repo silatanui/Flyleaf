@@ -13,6 +13,15 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+
+try:
+    torch.set_num_threads(1)
+except Exception:
+    pass
+try:
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
 from transformers import AutoConfig, AutoModel, AutoTokenizer, PreTrainedModel
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -230,7 +239,7 @@ class Detector:
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             patch_deberta_attention()
-            torch.set_num_threads(max(1, (os.cpu_count() or 2) - 1))
+            torch.set_num_threads(1)
             source = str(LOCAL_DIR) if weights_ready() else MODEL_ID
             local_only = weights_ready()
             self._tokenizer = AutoTokenizer.from_pretrained(source, local_files_only=local_only, cache_dir=str(CACHE_DIR))

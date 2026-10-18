@@ -198,16 +198,25 @@ function buttonsAvailable() {
   humanizeButton.disabled = !humanizerReady;
 }
 
+async function readStatus(path) {
+  const response = await fetch(appPath(path));
+  if (!response.ok) throw new Error("status unavailable");
+  return response.json();
+}
+
 async function pollReady() {
-  const [detectorResponse, humanResponse] = await Promise.all([
-    fetch(appPath("/api/status")),
-    fetch(appPath("/api/humanize/status")),
-  ]);
-  const detector = await detectorResponse.json();
-  const human = await humanResponse.json();
+  const detector = await readStatus("/api/status");
+  let human = { status: "loading", error: null };
+  try {
+    human = await readStatus("/api/humanize/status");
+  } catch (error) {
+    human = { status: "loading", error: null };
+  }
   detectorReady = detector.status === "ready";
   humanizerReady = human.status === "ready";
-  if (detector.status === "error") {
+  if (detector.error && !detectorReady) {
+    modelState.textContent = detector.error;
+  } else if (detector.status === "error") {
     modelState.textContent = detector.error || "Flyleaf failed to load.";
   } else if (human.status === "error" && detectorReady) {
     modelState.textContent = "Check for AI is ready. The humanizer failed to load.";

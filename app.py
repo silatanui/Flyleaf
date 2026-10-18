@@ -162,11 +162,13 @@ def review_download(review_id: str):
 
 @app.get("/api/status")
 def status():
+    _start_model_load()
     return jsonify({"status": detector.status, "error": detector.error, "model": "desklib/ai-text-detector-v1.01"})
 
 
 @app.get("/api/humanize/status")
 def humanize_status():
+    _start_model_load()
     return jsonify({"status": humanizer.status, "error": humanizer.error, "model": humanizer.model_name})
 
 
@@ -276,27 +278,55 @@ def missing(_error):
     return render_template("missing.html"), 404
 
 
+_loader_lock = threading.Lock()
+_loader_running = False
+_thread_failures = 0
+
+
 def _load_models() -> None:
+    global _loader_running
     try:
-        detector.load()
-    except Exception:
-        app.logger.exception("Detector failed to load")
-    try:
-        humanizer.load()
-    except Exception:
-        app.logger.exception("Humanizer failed to load")
+        if detector.status != "ready":
+            detector.status = "loading"
+            detector.error = None
+            try:
+                detector.load()
+            except Exception:
+                app.logger.exception("Detector failed to load")
+        if humanizer.status != "ready":
+            humanizer.status = "loading"
+            humanizer.error = None
+            try:
+                humanizer.load()
+            except Exception:
+                app.logger.exception("Humanizer failed to load")
+    finally:
+        with _loader_lock:
+            _loader_running = False
 
 
 def _start_model_load() -> None:
-    try:
-        threading.Thread(target=_load_models, daemon=True).start()
-    except RuntimeError:
-        app.logger.exception("Flyleaf could not start the model loader")
-        message = "The host could not start a worker thread."
-        detector.status = "error"
-        detector.error = message
-        humanizer.status = "error"
-        humanizer.error = message
+    """Start the loader once. A full process list should not freeze the buttons."""
+    global _loader_running, _thread_failures
+    if detector.status != "loading" and humanizer.status != "loading":
+        return
+    with _loader_lock:
+        if _loader_running or (detector.status != "loading" and humanizer.status != "loading"):
+            return
+        _loader_running = True
+        try:
+            threading.Thread(target=_load_models, daemon=True).start()
+        except RuntimeError:
+            _loader_running = False
+            _thread_failures += 1
+            app.logger.exception("Flyleaf could not start the model loader")
+            if detector.status != "ready":
+                detector.status = "loading"
+                detector.error = (
+                    "The host has no free worker slot yet. Wait a minute, then reload this page."
+                    if _thread_failures >= 2
+                    else None
+                )
 
 
 _start_model_load()
