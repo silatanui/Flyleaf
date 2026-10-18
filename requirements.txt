@@ -1,6 +1,7 @@
 torch
 transformers>=4.46,<5
 sentencepiece
+protobuf
 flask
 pymysql
 python-docx
