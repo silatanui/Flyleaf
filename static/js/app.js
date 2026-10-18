@@ -39,6 +39,15 @@ function appPath(path) {
   return `${root}/${path}`;
 }
 
+async function readJson(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error("Flyleaf could not finish that request. Wait a minute and try again.");
+  }
+}
+
 function words(value) {
   const found = value.trim().match(/\b[\w']+\b/g);
   return found ? found.length : 0;
@@ -262,13 +271,13 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
       headers: isForm ? undefined : { "Content-Type": "application/json" },
       body: isForm ? body : JSON.stringify(body),
     });
-    const payload = await response.json();
+    const payload = await readJson(response);
     if (!response.ok) throw new Error(payload.error || "The request could not be started.");
 
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, 400));
       const jobResponse = await fetch(appPath(`/api/jobs/${payload.job_id}`));
-      const job = await jobResponse.json();
+      const job = await readJson(jobResponse);
       if (!jobResponse.ok) throw new Error(job.error || "The job was lost.");
       if (typeof job.percent === "number") target = Math.max(target, job.percent);
       if (job.status === "done") {
@@ -303,7 +312,9 @@ checkButton.addEventListener("click", () => {
     });
     return;
   }
-  runJob(appPath("/api/analyze"), { text: draft.value }, false, "Reviewing the draft", "Opening the review", showReport);
+  const textBody = new URLSearchParams();
+  textBody.set("text", draft.value);
+  runJob(appPath("/api/analyze"), textBody, true, "Reviewing the draft", "Opening the review", showReport);
 });
 
 humanizeButton.addEventListener("click", () => {
@@ -311,7 +322,9 @@ humanizeButton.addEventListener("click", () => {
     window.alert("Paste a paragraph to humanize.");
     return;
   }
-  runJob(appPath("/api/humanize"), { text: draft.value }, false, "Rewriting the draft", "Rewrite ready", showRewrite);
+  const textBody = new URLSearchParams();
+  textBody.set("text", draft.value);
+  runJob(appPath("/api/humanize"), textBody, true, "Rewriting the draft", "Rewrite ready", showRewrite);
 });
 
 document.querySelector("#copy").addEventListener("click", async () => {

@@ -17,6 +17,7 @@ import uuid
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, render_template, request, send_file
+from werkzeug.exceptions import HTTPException
 
 from detector.engine import detector
 from detector.humanizer import humanizer
@@ -221,7 +222,7 @@ def humanize_api():
             "result": None,
             "error": None,
         }
-    threading.Thread(target=_run_humanize, args=(job_id, text), daemon=True).start()
+    _spawn(_run_humanize, (job_id, text))
     return jsonify({"job_id": job_id})
 
 
@@ -259,7 +260,7 @@ def analyze():
             "error": None,
         }
     prefix = request.script_root.rstrip("/")
-    threading.Thread(target=_run_job, args=(job_id, text, pdf_bytes, filename, prefix), daemon=True).start()
+    _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix))
     return jsonify({"job_id": job_id})
 
 
@@ -275,7 +276,26 @@ def job(job_id: str):
 
 @app.errorhandler(404)
 def missing(_error):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "That request was not found."}), 404
     return render_template("missing.html"), 404
+
+
+@app.errorhandler(Exception)
+def unhandled(exc):
+    if isinstance(exc, HTTPException):
+        return exc
+    app.logger.exception("Request failed")
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Flyleaf could not finish that request."}), 500
+    return render_template("missing.html"), 500
+
+
+def _spawn(target, args) -> None:
+    try:
+        threading.Thread(target=target, args=args, daemon=True).start()
+    except RuntimeError:
+        target(*args)
 
 
 _loader_lock = threading.Lock()
