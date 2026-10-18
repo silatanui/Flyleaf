@@ -14,6 +14,7 @@ import io
 import json
 import re
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -241,8 +242,21 @@ def humanize_api():
     return _job_response(job_id)
 
 
+def _wait_for_detector(seconds: float = 180) -> str:
+    deadline = time.monotonic() + seconds
+    while True:
+        _start_model_load()
+        if detector.status in {"ready", "error"}:
+            return detector.status
+        if time.monotonic() >= deadline:
+            return detector.status
+        time.sleep(0.4)
+
+
 @app.post("/api/analyze")
 def analyze():
+    if detector.status != "ready":
+        _wait_for_detector()
     if detector.status == "loading":
         return jsonify({"error": "Flyleaf is still getting ready. Try again in a minute."}), 503
     if detector.status == "error":

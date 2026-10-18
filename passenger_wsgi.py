@@ -13,4 +13,21 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+
+def _one_process() -> None:
+    """Two Passenger processes each load the model and the host returns 503."""
+    try:
+        public = Path.home() / "public_html" / "Flyleaf" / ".htaccess"
+        if not public.is_file():
+            return
+        text = public.read_text(encoding="utf-8", errors="replace")
+        if "PassengerMaxPoolSize" in text:
+            return
+        public.write_text(text.rstrip() + "\nPassengerMaxPoolSize 1\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+_one_process()
+
 from app import app as application
