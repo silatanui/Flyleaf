@@ -60,10 +60,21 @@ class Humanizer:
         if _has_weights(PARAPHRASE_DIR, 800_000_000):
             return PARAPHRASE_DIR, "paraphrase: ", PARAPHRASE_ID
         if not _has_weights(LOCAL_DIR, 60_000_000):
-            from huggingface_hub import snapshot_download
-
-            snapshot_download(repo_id=MODEL_ID, allow_patterns=["en/*"], local_dir=str(ROOT / "models" / "humanizer"))
+            _download_humanizer()
         return LOCAL_DIR, "", MODEL_ID
+
+
+def _download_humanizer() -> None:
+    """Download one file at a time. snapshot_download opens a thread pool, and this host rejects that."""
+    from huggingface_hub import hf_hub_download, list_repo_files
+
+    destination = ROOT / "models" / "humanizer"
+    destination.mkdir(parents=True, exist_ok=True)
+    names = [name for name in list_repo_files(MODEL_ID) if name.startswith("en/") and not name.endswith("/")]
+    if not names:
+        raise RuntimeError("The humanizer model has no English files to download.")
+    for name in names:
+        hf_hub_download(repo_id=MODEL_ID, filename=name, local_dir=str(destination))
 
     def rewrite(self, text: str, progress=None) -> dict:
         cleaned = text.strip()
