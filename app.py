@@ -14,7 +14,6 @@ import io
 import json
 import re
 import threading
-import time
 import uuid
 from pathlib import Path
 
@@ -27,6 +26,7 @@ from detector.report_pdf import build_reviewed_pdf, pdf_text, write_preview_imag
 
 ROOT = Path(__file__).resolve().parent
 REVIEW_DIR = ROOT / "storage" / "reviews"
+JOB_DIR = ROOT / "storage" / "jobs"
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
@@ -68,6 +68,7 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
             job["total"] = total
             job["percent"] = 0 if total <= 0 else round(100 * done / total)
             job["message"] = "Reviewing the draft"
+        _publish_job(job_id)
 
     try:
         result = detector.score(text, progress=progress)
@@ -100,11 +101,13 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
             _jobs[job_id]["percent"] = 100
             _jobs[job_id]["result"] = result
             _jobs[job_id]["message"] = "Report ready"
+        _publish_job(job_id)
     except Exception as exc:
         with _jobs_lock:
             _jobs[job_id]["status"] = "error"
             _jobs[job_id]["error"] = str(exc)
             _jobs[job_id]["message"] = "The review could not be finished"
+        _publish_job(job_id)
 
 
 @app.get("/")
@@ -198,6 +201,7 @@ def _run_humanize(job_id: str, text: str) -> None:
             job["done"] = done
             job["total"] = total
             job["percent"] = 0 if total <= 0 else round(100 * done / total)
+        _publish_job(job_id)
 
     try:
         result = humanizer.rewrite(text, progress=progress)
@@ -206,11 +210,13 @@ def _run_humanize(job_id: str, text: str) -> None:
             _jobs[job_id]["percent"] = 100
             _jobs[job_id]["result"] = result
             _jobs[job_id]["message"] = "Rewrite ready"
+        _publish_job(job_id)
     except Exception as exc:
         with _jobs_lock:
             _jobs[job_id]["status"] = "error"
             _jobs[job_id]["error"] = str(exc)
             _jobs[job_id]["message"] = "The rewrite could not be finished"
+        _publish_job(job_id)
 
 
 @app.post("/api/humanize")
@@ -238,25 +244,14 @@ def humanize_api():
             "result": None,
             "error": None,
         }
-    _run_humanize(job_id, text)
-    return _job_response(job_id)
-
-
-def _wait_for_detector(seconds: float = 180) -> str:
-    deadline = time.monotonic() + seconds
-    while True:
-        _start_model_load()
-        if detector.status in {"ready", "error"}:
-            return detector.status
-        if time.monotonic() >= deadline:
-            return detector.status
-        time.sleep(0.4)
+    _publish_job(job_id)
+    if not _spawn(_run_humanize, (job_id, text)):
+        return jsonify({"error": "The host could not start the rewrite. Wait a minute and try again."}), 503
+    return jsonify({"job_id": job_id, "status": "running"})
 
 
 @app.post("/api/analyze")
 def analyze():
-    if detector.status != "ready":
-        _wait_for_detector()
     if detector.status == "loading":
         return jsonify({"error": "Flyleaf is still getting ready. Try again in a minute."}), 503
     if detector.status == "error":
@@ -289,26 +284,43 @@ def analyze():
             "error": None,
         }
     prefix = request.script_root.rstrip("/")
-    _run_job(job_id, text, pdf_bytes, filename, prefix)
-    return _job_response(job_id)
+    _publish_job(job_id)
+    if not _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix)):
+        return jsonify({"error": "The host could not start the check. Wait a minute and try again."}), 503
+    return jsonify({"job_id": job_id, "status": "running"})
 
 
-def _job_response(job_id: str):
+def _publish_job(job_id: str) -> None:
+    JOB_DIR.mkdir(parents=True, exist_ok=True)
     with _jobs_lock:
-        job = dict(_jobs.get(job_id) or {})
-    if job.get("status") == "error":
-        return jsonify({"error": job.get("error") or "The check could not be finished."}), 500
-    return jsonify({"job_id": job_id, "status": job.get("status"), "result": job.get("result"), "error": job.get("error")})
+        job = _jobs.get(job_id)
+        if job is None:
+            return
+        payload = dict(job)
+    (JOB_DIR / f"{job_id}.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _stored_job(job_id: str) -> dict | None:
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is not None:
+            return dict(job)
+    path = JOB_DIR / f"{job_id}.json"
+    if not path.is_file():
+        return None
+    try:
+        found = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return found if isinstance(found, dict) else None
 
 
 @app.get("/api/jobs/<job_id>")
 def job(job_id: str):
-    with _jobs_lock:
-        found = _jobs.get(job_id)
-        if found is None:
-            return jsonify({"error": "That check has expired."}), 404
-        payload = dict(found)
-    return jsonify(payload)
+    found = _stored_job(job_id)
+    if found is None:
+        return jsonify({"error": "That check has expired."}), 404
+    return jsonify(found)
 
 
 @app.errorhandler(404)
@@ -328,11 +340,12 @@ def unhandled(exc):
     return render_template("missing.html"), 500
 
 
-def _spawn(target, args) -> None:
+def _spawn(target, args) -> bool:
     try:
         threading.Thread(target=target, args=args, daemon=True).start()
     except RuntimeError:
-        target(*args)
+        return False
+    return True
 
 
 _loader_lock = threading.Lock()

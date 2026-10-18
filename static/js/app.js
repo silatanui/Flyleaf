@@ -282,7 +282,11 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
     }
     if (payload.status === "error") throw new Error(payload.error || "The job could not be finished.");
 
+    const started = Date.now();
     for (;;) {
+      if (Date.now() - started > 180000) {
+        throw new Error("The check is taking too long. Wait a minute and try a shorter passage.");
+      }
       await new Promise((resolve) => setTimeout(resolve, 400));
       const jobResponse = await fetch(appPath(`/api/jobs/${payload.job_id}`));
       const job = await readJson(jobResponse);
