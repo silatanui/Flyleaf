@@ -11,6 +11,7 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import io
+import json
 import re
 import threading
 import uuid
@@ -88,6 +89,7 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
                 "scored_words": result["scored_words"],
                 "page_count": page_count,
             }
+            (REVIEW_DIR / f"{review_id}.json").write_text(json.dumps(summary), encoding="utf-8")
             with _jobs_lock:
                 _reviews[review_id] = {"path": path, "summary": summary}
             result["review_id"] = review_id
@@ -127,10 +129,25 @@ def review_page(review_id: str, number: int):
     return send_file(path, mimetype="image/png")
 
 
-@app.get("/review/<review_id>")
-def review(review_id: str):
+def _stored_review(review_id: str) -> dict | None:
     with _jobs_lock:
         item = _reviews.get(review_id)
+    if item is not None:
+        return item
+    meta = REVIEW_DIR / f"{review_id}.json"
+    pdf = REVIEW_DIR / f"{review_id}.pdf"
+    if not meta.is_file() or not pdf.is_file():
+        return None
+    summary = json.loads(meta.read_text(encoding="utf-8"))
+    item = {"path": pdf, "summary": summary}
+    with _jobs_lock:
+        _reviews[review_id] = item
+    return item
+
+
+@app.get("/review/<review_id>")
+def review(review_id: str):
+    item = _stored_review(review_id)
     if item is None:
         abort(404)
     return render_template("review.html", review_id=review_id, summary=item["summary"])
@@ -138,8 +155,7 @@ def review(review_id: str):
 
 @app.get("/review/<review_id>/file")
 def review_file(review_id: str):
-    with _jobs_lock:
-        item = _reviews.get(review_id)
+    item = _stored_review(review_id)
     if item is None:
         abort(404)
     name = Path(item["summary"]["filename"]).stem or "draft"
@@ -148,8 +164,7 @@ def review_file(review_id: str):
 
 @app.get("/review/<review_id>/download")
 def review_download(review_id: str):
-    with _jobs_lock:
-        item = _reviews.get(review_id)
+    item = _stored_review(review_id)
     if item is None:
         abort(404)
     name = Path(item["summary"]["filename"]).stem or "draft"
@@ -222,8 +237,8 @@ def humanize_api():
             "result": None,
             "error": None,
         }
-    _spawn(_run_humanize, (job_id, text))
-    return jsonify({"job_id": job_id})
+    _run_humanize(job_id, text)
+    return _job_response(job_id)
 
 
 @app.post("/api/analyze")
@@ -260,8 +275,16 @@ def analyze():
             "error": None,
         }
     prefix = request.script_root.rstrip("/")
-    _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix))
-    return jsonify({"job_id": job_id})
+    _run_job(job_id, text, pdf_bytes, filename, prefix)
+    return _job_response(job_id)
+
+
+def _job_response(job_id: str):
+    with _jobs_lock:
+        job = dict(_jobs.get(job_id) or {})
+    if job.get("status") == "error":
+        return jsonify({"error": job.get("error") or "The check could not be finished."}), 500
+    return jsonify({"job_id": job_id, "status": job.get("status"), "result": job.get("result"), "error": job.get("error")})
 
 
 @app.get("/api/jobs/<job_id>")

@@ -273,6 +273,14 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
     });
     const payload = await readJson(response);
     if (!response.ok) throw new Error(payload.error || "The request could not be started.");
+    if (payload.status === "done" && payload.result) {
+      finished = true;
+      target = 100;
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      onDone(payload.result);
+      return;
+    }
+    if (payload.status === "error") throw new Error(payload.error || "The job could not be finished.");
 
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, 400));
