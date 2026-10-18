@@ -48,6 +48,16 @@ async function readJson(response) {
   }
 }
 
+async function readJob(url) {
+  try {
+    const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return JSON.parse(await response.text());
+  } catch (error) {
+    return null;
+  }
+}
+
 function words(value) {
   const found = value.trim().match(/\b[\w']+\b/g);
   return found ? found.length : 0;
@@ -283,14 +293,15 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
     if (payload.status === "error") throw new Error(payload.error || "The job could not be finished.");
 
     const started = Date.now();
+    const watchUrl = payload.watch_url || appPath(`/api/jobs/${payload.job_id}`);
     for (;;) {
       if (Date.now() - started > 180000) {
         throw new Error("The check is taking too long. Wait a minute and try a shorter passage.");
       }
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      const jobResponse = await fetch(appPath(`/api/jobs/${payload.job_id}`));
-      const job = await readJson(jobResponse);
-      if (!jobResponse.ok) throw new Error(job.error || "The job was lost.");
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      let job = await readJob(watchUrl);
+      if (!job) job = await readJob(appPath(`/api/jobs/${payload.job_id}`));
+      if (!job) continue;
       if (typeof job.percent === "number") target = Math.max(target, job.percent);
       if (job.status === "done") {
         finished = true;

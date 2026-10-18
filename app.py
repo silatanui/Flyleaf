@@ -247,7 +247,8 @@ def humanize_api():
     _publish_job(job_id)
     if not _spawn(_run_humanize, (job_id, text)):
         return jsonify({"error": "The host could not start the rewrite. Wait a minute and try again."}), 503
-    return jsonify({"job_id": job_id, "status": "running"})
+    prefix = request.script_root.rstrip("/")
+    return jsonify({"job_id": job_id, "status": "running", "watch_url": f"{prefix}/jobs/{job_id}.json"})
 
 
 @app.post("/api/analyze")
@@ -287,7 +288,7 @@ def analyze():
     _publish_job(job_id)
     if not _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix)):
         return jsonify({"error": "The host could not start the check. Wait a minute and try again."}), 503
-    return jsonify({"job_id": job_id, "status": "running"})
+    return jsonify({"job_id": job_id, "status": "running", "watch_url": f"{prefix}/jobs/{job_id}.json"})
 
 
 def _publish_job(job_id: str) -> None:
@@ -297,7 +298,15 @@ def _publish_job(job_id: str) -> None:
         if job is None:
             return
         payload = dict(job)
-    (JOB_DIR / f"{job_id}.json").write_text(json.dumps(payload), encoding="utf-8")
+    raw = json.dumps(payload)
+    (JOB_DIR / f"{job_id}.json").write_text(raw, encoding="utf-8")
+    public = Path.home() / "public_html" / "Flyleaf" / "jobs"
+    try:
+        if public.parent.is_dir():
+            public.mkdir(parents=True, exist_ok=True)
+            (public / f"{job_id}.json").write_text(raw, encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _stored_job(job_id: str) -> dict | None:

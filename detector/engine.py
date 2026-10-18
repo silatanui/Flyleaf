@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import threading
+import time
 from pathlib import Path
 
 import torch
@@ -287,14 +288,13 @@ class Detector:
         with self._lock:
             qualifying = [section for section in sections if section["qualifying"]]
             total = len(qualifying) or 1
-            batch = 8
-            for start in range(0, len(qualifying), batch):
+            for start, section in enumerate(qualifying):
                 if progress:
                     progress(start, total, "Reviewing the draft")
-                chunk = qualifying[start:start + batch]
-                for section, probability in zip(chunk, self._probabilities([item["text"] for item in chunk])):
-                    section["ai_probability"] = probability
-                    section["label"] = _label(probability)
+                probability = self._probabilities([section["text"]])[0]
+                section["ai_probability"] = probability
+                section["label"] = _label(probability)
+                time.sleep(0.05)
             if progress:
                 progress(total, total, "Finishing the report")
 

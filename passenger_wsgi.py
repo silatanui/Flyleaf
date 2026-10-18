@@ -21,9 +21,14 @@ def _one_process() -> None:
         if not public.is_file():
             return
         text = public.read_text(encoding="utf-8", errors="replace")
-        if "PassengerMaxPoolSize" in text:
+        extra = []
+        if "PassengerMaxPoolSize" not in text:
+            extra.append("PassengerMaxPoolSize 1")
+        if "PassengerMaxRequestTime" not in text:
+            extra.append("PassengerMaxRequestTime 0")
+        if not extra:
             return
-        public.write_text(text.rstrip() + "\nPassengerMaxPoolSize 1\n", encoding="utf-8")
+        public.write_text(text.rstrip() + "\n" + "\n".join(extra) + "\n", encoding="utf-8")
     except OSError:
         return
 
