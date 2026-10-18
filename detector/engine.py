@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 import re
 import threading
-import time
 from pathlib import Path
 
 # The Rust tokenizer builds a thread pool on first use. This host rejects that pool.
@@ -20,7 +19,7 @@ import torch
 import torch.nn as nn
 
 try:
-    torch.set_num_threads(1)
+    torch.set_num_threads(2)
 except Exception:
     pass
 try:
@@ -244,7 +243,7 @@ class Detector:
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             patch_deberta_attention()
-            torch.set_num_threads(1)
+            torch.set_num_threads(2)
             source = str(LOCAL_DIR) if weights_ready() else MODEL_ID
             local_only = weights_ready()
             self._tokenizer = AutoTokenizer.from_pretrained(source, local_files_only=local_only, cache_dir=str(CACHE_DIR))
@@ -292,13 +291,15 @@ class Detector:
         with self._lock:
             qualifying = [section for section in sections if section["qualifying"]]
             total = len(qualifying) or 1
-            for start, section in enumerate(qualifying):
+            batch = 4
+            for start in range(0, len(qualifying), batch):
+                chunk = qualifying[start:start + batch]
                 if progress:
                     progress(start, total, "Reviewing the draft")
-                probability = self._probabilities([section["text"]])[0]
-                section["ai_probability"] = probability
-                section["label"] = _label(probability)
-                time.sleep(0.05)
+                probabilities = self._probabilities([section["text"] for section in chunk])
+                for section, probability in zip(chunk, probabilities):
+                    section["ai_probability"] = probability
+                    section["label"] = _label(probability)
             if progress:
                 progress(total, total, "Finishing the report")
 

@@ -23,6 +23,7 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
+from accounts import current_user, init_accounts, saved_id_for_review
 from detector.engine import detector
 from detector.humanizer import humanizer
 from detector.report_pdf import build_reviewed_pdf, pdf_text, write_preview_images
@@ -33,6 +34,7 @@ JOB_DIR = ROOT / "storage" / "jobs"
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+init_accounts(app)
 
 _jobs: dict[str, dict] = {}
 _reviews: dict[str, dict] = {}
@@ -173,7 +175,14 @@ def review(review_id: str):
     item = _stored_review(review_id)
     if item is None:
         abort(404)
-    return render_template("review.html", review_id=review_id, summary=item["summary"])
+    user = current_user()
+    saved_id = saved_id_for_review(user["id"], review_id) if user else None
+    return render_template(
+        "review.html",
+        review_id=review_id,
+        summary=item["summary"],
+        saved_id=saved_id,
+    )
 
 
 @app.get("/review/<review_id>/file")
@@ -212,6 +221,8 @@ def humanize_status():
 
 
 def _run_humanize(job_id: str, text: str) -> None:
+    stop = threading.Event()
+
     def progress(done: int, total: int) -> None:
         with _jobs_lock:
             job = _jobs.get(job_id)
@@ -222,6 +233,15 @@ def _run_humanize(job_id: str, text: str) -> None:
             job["percent"] = 0 if total <= 0 else round(100 * done / total)
         _publish_job(job_id)
 
+    def beat() -> None:
+        while not stop.wait(10):
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+                if job is None or job.get("status") != "running":
+                    return
+            _publish_job(job_id)
+
+    threading.Thread(target=beat, daemon=True).start()
     try:
         result = humanizer.rewrite(text, progress=progress)
         with _jobs_lock:
@@ -236,6 +256,8 @@ def _run_humanize(job_id: str, text: str) -> None:
             _jobs[job_id]["error"] = str(exc)
             _jobs[job_id]["message"] = "The rewrite could not be finished"
         _publish_job(job_id)
+    finally:
+        stop.set()
 
 
 @app.post("/api/humanize")
@@ -254,8 +276,11 @@ def humanize_api():
         return jsonify({"error": "Add some text to humanize."}), 400
     job_id = uuid.uuid4().hex
     with _jobs_lock:
+        if any(item.get("kind") == "humanize" and item.get("status") == "running" for item in _jobs.values()):
+            return jsonify({"error": "A rewrite is already running. Give it a moment, then try again."}), 503
         _jobs[job_id] = {
             "status": "running",
+            "kind": "humanize",
             "done": 0,
             "total": 1,
             "percent": 6,

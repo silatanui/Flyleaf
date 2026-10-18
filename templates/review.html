@@ -5,6 +5,16 @@
   <div class="review-bar-inner">
     <p class="review-file">{{ summary.filename }}</p>
     <p class="review-score">{{ summary.flagged_percent }}% AI-like · {{ summary.uncertain_percent }}% inconclusive</p>
+    {% if saved_id %}
+    <span class="review-saved">Saved</span>
+    {% elif account %}
+    <form class="review-save" method="post" action="{{ url_for('save_review', review_id=review_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="button ghost" type="submit">Save this report</button>
+    </form>
+    {% else %}
+    <a class="button ghost review-save" href="{{ url_for('login', next='/review/' ~ review_id) }}">Sign in to save</a>
+    {% endif %}
     <a class="button ghost" href="{{ url_for('review_download', review_id=review_id) }}">Download</a>
     <button type="button" class="button" id="print-review">Print</button>
   </div>

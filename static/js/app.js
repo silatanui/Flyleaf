@@ -1,9 +1,11 @@
 const draft = document.querySelector("#draft");
 const fileInput = document.querySelector("#file");
-const fileName = document.querySelector("#file-name");
+const uploadLabel = document.querySelector("#upload-label");
 const wordCount = document.querySelector("#word-count");
 const checkButton = document.querySelector("#check");
 const humanizeButton = document.querySelector("#humanize");
+const offerHumanize = document.querySelector("#offer-humanize");
+const HIGH_AI = 50;
 const modelState = document.querySelector("#model-state");
 const reportBody = document.querySelector("#report-body");
 const rewriteBody = document.querySelector("#rewrite-body");
@@ -11,7 +13,8 @@ const reportEmpty = document.querySelector("#report-empty");
 const progress = document.querySelector("#progress");
 const progressLabel = document.querySelector("#progress-label");
 const progressPct = document.querySelector("#progress-pct");
-const progressRing = document.querySelector("#progress-ring");
+const progressBar = document.querySelector("#progress-bar");
+const progressTrack = document.querySelector("#progress-track");
 
 const samples = {
   human: `I missed the 6:40 daladala and ended up walking from Mwenge with a torn umbrella. The rain was not even serious, just that annoying spit that still soaks a notebook. My phone had 4 percent and of course the power bank was in the other bag, the one I left on the chair at home. By the time I got to class the quiz had started. I wrote my name too big and then stared at question two, the one about buffers, and my mind went completely blank except for the fact that my socks were wet. I still think the lecturer saw me come in. She did not say anything. She just tapped her watch once, which was worse.`,
@@ -20,6 +23,8 @@ const samples = {
 
 let detectorReady = false;
 let humanizerReady = false;
+let lastCheck = null;
+let lastRewrite = null;
 
 function appRoot() {
   const script = document.querySelector("script[src*='app.js']");
@@ -66,6 +71,7 @@ function words(value) {
 function refreshCount() {
   const count = words(draft.value);
   wordCount.textContent = `${count} word${count === 1 ? "" : "s"}`;
+  draft.classList.toggle("has-prose", Boolean(draft.value.trim()));
 }
 
 function selectedPdf() {
@@ -162,59 +168,288 @@ function drawGauge(host, reading, caption) {
   </svg>`;
 }
 
+function shareSentence(reading, kind) {
+  const { ai, uncertain } = reading;
+  let lead = "This draft was not classified as AI-like.";
+  if (ai >= 60) lead = "Much of this draft was classified as AI-like.";
+  else if (ai >= 25) lead = "This draft is mixed. Some of it was classified as AI-like.";
+  else if (ai > 0) lead = "A small share was classified as AI-like.";
+  else if (uncertain >= 25) lead = "None of it was classified as clearly AI-like. A noticeable share was inconclusive.";
+  if (kind === "rewrite") lead = `After the rewrite, ${lead.charAt(0).toLowerCase()}${lead.slice(1)}`;
+  return lead;
+}
+
+function drawShareRing(host, reading) {
+  if (!host) return;
+  const human = reading.human;
+  const mid = reading.uncertain;
+  const ai = reading.ai;
+  const parts = [
+    { value: human, color: "#1f9d57" },
+    { value: mid, color: "#6b5b8a" },
+    { value: ai, color: "#c9342e" },
+  ];
+  let cursor = 0;
+  const arcs = parts.map((part) => {
+    const start = cursor;
+    cursor += part.value;
+    if (part.value <= 0) return "";
+    const begin = Math.PI * 2 * (start / 100) - Math.PI / 2;
+    const end = Math.PI * 2 * (cursor / 100) - Math.PI / 2;
+    const large = part.value > 50 ? 1 : 0;
+    const r = 46;
+    const cx = 60;
+    const cy = 60;
+    const x0 = cx + r * Math.cos(begin);
+    const y0 = cy + r * Math.sin(begin);
+    const x1 = cx + r * Math.cos(end);
+    const y1 = cy + r * Math.sin(end);
+    if (part.value >= 100) {
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${part.color}" stroke-width="12"></circle>`;
+    }
+    return `<path d="M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}" fill="none" stroke="${part.color}" stroke-width="12"></path>`;
+  }).join("");
+  host.innerHTML = `<svg viewBox="0 0 120 120" role="img" aria-label="${ai}% AI-like, ${mid}% inconclusive, ${human}% human-like">
+    <circle cx="60" cy="60" r="46" fill="none" stroke="#e6edf3" stroke-width="12"></circle>
+    ${arcs}
+    <text x="60" y="56" text-anchor="middle" font-family="Outfit, sans-serif" font-size="22" font-weight="650" fill="#1c2430">${ai}%</text>
+    <text x="60" y="72" text-anchor="middle" font-family="Outfit, sans-serif" font-size="10" fill="#5c6b78">AI-like</text>
+  </svg>`;
+}
+
+function fillReading(reading, confidence, wordCount, kind) {
+  const host = document.querySelector("#reading-more");
+  if (!host) return;
+  const line = document.querySelector("#reading-line");
+  line.innerHTML = "";
+  const lead = document.createElement("span");
+  lead.textContent = shareSentence(reading, kind);
+  lead.style.fontWeight = "650";
+  lead.style.color = "var(--ink)";
+  lead.style.fontSize = "20px";
+  const note = document.createElement("span");
+  note.textContent = "That is an estimate. It does not establish whether the text was written by AI.";
+  line.append(lead, note);
+  drawShareRing(document.querySelector("#share-ring"), reading);
+  const list = document.querySelector("#share-list");
+  const rows = [
+    ["Human-like", reading.human, "#1f9d57"],
+    ["Inconclusive", reading.uncertain, "#6b5b8a"],
+    ["AI-like", reading.ai, "#c9342e"],
+  ];
+  list.replaceChildren();
+  for (const [name, value, color] of rows) {
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.className = "share-name";
+    const dot = document.createElement("span");
+    dot.className = "share-dot";
+    dot.style.background = color;
+    label.append(dot, document.createTextNode(name));
+    const strong = document.createElement("strong");
+    strong.textContent = `${value}%`;
+    item.append(label, strong);
+    list.append(item);
+  }
+  const facts = document.querySelector("#reading-facts");
+  facts.replaceChildren();
+  const cards = [
+    ["Confidence", confidence ? confidence.charAt(0).toUpperCase() + confidence.slice(1) : "Shown on the gauge"],
+    ["Length", `${Number(wordCount) || 0} words`],
+    ["The reading", "One English model, on this computer"],
+  ];
+  for (const [title, body] of cards) {
+    const card = document.createElement("article");
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    const copy = document.createElement("p");
+    copy.textContent = body;
+    card.append(heading, copy);
+    facts.append(card);
+  }
+  host.hidden = false;
+}
+
+function sentenceSpan(sentence) {
+  const span = document.createElement("span");
+  const pct = Math.round((Number(sentence.ai_probability) || 0) * 100);
+  const names = { ai: "AI-like", uncertain: "Inconclusive", human: "Human-like" };
+  const shown = sentence.label === "human" ? 100 - pct : pct;
+  span.className = sentence.label || "human";
+  span.dataset.tip = `${names[sentence.label] || "Read"} ${shown}%`;
+  return span;
+}
+
+function locateSentence(text, needle, from) {
+  if (!needle) return null;
+  const exact = text.indexOf(needle, from);
+  if (exact >= 0) return { start: exact, end: exact + needle.length };
+  const parts = needle.split(/\s+/).filter(Boolean);
+  if (!parts.length) return null;
+  const pattern = parts.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+  const match = new RegExp(pattern, "g");
+  match.lastIndex = from;
+  const found = match.exec(text);
+  if (!found) return null;
+  return { start: found.index, end: found.index + found[0].length };
+}
+
+function paintPassage(host, source, sentences) {
+  host.replaceChildren();
+  const text = source && source.trim() ? source : (sentences || []).map((item) => item.text).join(" ");
+  let cursor = 0;
+  (sentences || []).forEach((sentence) => {
+    const place = locateSentence(text, sentence.text || "", cursor);
+    const span = sentenceSpan(sentence);
+    if (!place) {
+      if (host.childNodes.length) host.append(document.createTextNode("\n\n"));
+      span.textContent = sentence.text || "";
+      host.append(span);
+      return;
+    }
+    if (place.start > cursor) host.append(document.createTextNode(text.slice(cursor, place.start)));
+    span.textContent = text.slice(place.start, place.end);
+    host.append(span);
+    cursor = place.end;
+  });
+  if (cursor < text.length) host.append(document.createTextNode(text.slice(cursor)));
+}
+
 function showReport(result) {
+  lastCheck = result;
   const reading = readingOf(result.flagged_percent, result.uncertain_percent);
   drawGauge(document.querySelector("#donut"), reading, "AI-like");
   document.querySelector("#donut-blurb").textContent = `${explainReading(reading)} Confidence is ${result.confidence}.`;
-  document.querySelector("#confidence-line").textContent = "";
+  const confidenceLine = document.querySelector("#confidence-line");
+  if (confidenceLine) confidenceLine.textContent = "";
+  fillReading(reading, result.confidence, result.word_count, "check");
 
   const warnings = document.querySelector("#warnings");
-  warnings.replaceChildren();
-  for (const warning of result.warnings) {
-    const item = document.createElement("li");
-    item.textContent = warning;
-    warnings.appendChild(item);
+  if (warnings) {
+    warnings.replaceChildren();
+    for (const warning of result.warnings || []) {
+      const item = document.createElement("li");
+      item.textContent = warning;
+      warnings.appendChild(item);
+    }
   }
 
   const essay = document.querySelector("#essay");
-  essay.replaceChildren();
-  result.sentences.forEach((sentence, index) => {
-    if (index > 0) essay.append(" ");
-    const span = document.createElement("span");
-    span.className = sentence.label;
-    span.textContent = sentence.text;
-    span.title = `AI likelihood ${Math.round(sentence.ai_probability * 100)}%`;
-    essay.append(span);
-  });
-  rewriteBody.hidden = true;
-  reportEmpty.hidden = true;
-  reportBody.hidden = false;
-  reportBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (essay) {
+    const typed = draft && draft.value ? draft.value : "";
+    paintPassage(essay, typed, result.sentences || []);
+  }
+  if (rewriteBody) rewriteBody.hidden = true;
+  if (reportEmpty) reportEmpty.hidden = true;
+  if (reportBody) reportBody.hidden = false;
+  const scoreMore = document.querySelector("#score-more");
+  const reportScore = document.querySelector("#report-score");
+  const rewriteScore = document.querySelector("#rewrite-score");
+  if (scoreMore) scoreMore.hidden = false;
+  if (reportScore) reportScore.hidden = false;
+  if (rewriteScore) rewriteScore.hidden = true;
+  if (offerHumanize) offerHumanize.hidden = reading.ai < HIGH_AI;
+  const marked = document.querySelector("#marked-text");
+  const rewriteText = document.querySelector("#rewrite-text");
+  if (marked) marked.hidden = false;
+  if (rewriteText) rewriteText.hidden = true;
+  resetSave("#save-check", "#save-check-note", "Save this check");
+  if (reportBody) reportBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function showRewrite(result) {
+  lastRewrite = result;
   const before = readingOf(result.before_flagged, result.before_uncertain);
   const after = readingOf(result.after_flagged, result.after_uncertain);
   drawGauge(document.querySelector("#before-donut"), before, "before");
   drawGauge(document.querySelector("#after-donut"), after, "after");
   document.querySelector("#pair-blurb").textContent = `Before: ${explainReading(before)} After: ${explainReading(after)}`;
-  document.querySelector("#rewrite").textContent = result.text;
-  reportBody.hidden = true;
-  reportEmpty.hidden = true;
-  rewriteBody.hidden = false;
-  rewriteBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  const rewrite = document.querySelector("#rewrite");
+  if (rewrite) rewrite.textContent = result.text;
+  fillReading(after, "", result.word_count, "rewrite");
+  if (reportBody) reportBody.hidden = true;
+  if (reportEmpty) reportEmpty.hidden = true;
+  if (rewriteBody) rewriteBody.hidden = false;
+  const scoreMore = document.querySelector("#score-more");
+  const reportScore = document.querySelector("#report-score");
+  const rewriteScore = document.querySelector("#rewrite-score");
+  if (scoreMore) scoreMore.hidden = false;
+  if (reportScore) reportScore.hidden = true;
+  if (rewriteScore) rewriteScore.hidden = false;
+  if (offerHumanize) offerHumanize.hidden = true;
+  const marked = document.querySelector("#marked-text");
+  const rewriteText = document.querySelector("#rewrite-text");
+  if (marked) marked.hidden = true;
+  if (rewriteText) rewriteText.hidden = false;
+  resetSave("#save-rewrite", "#save-rewrite-note", "Save this rewrite");
+  if (rewriteBody) rewriteBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function resetSave(buttonId, noteId, label) {
+  const button = document.querySelector(buttonId);
+  const note = document.querySelector(noteId);
+  if (button && button.tagName === "BUTTON") {
+    button.disabled = false;
+    button.textContent = label;
+  }
+  if (note) note.textContent = "";
+}
+
+function sourceFor(result) {
+  const typed = (draft && draft.value ? draft.value : "").trim();
+  if (typed) return typed;
+  return (result.sentences || []).map((item) => item.text).join(" ");
+}
+
+async function storeWork(button, note, kind, source, result) {
+  button.disabled = true;
+  if (note) note.textContent = "Saving...";
+  try {
+    const token = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+    const response = await fetch(appPath("/api/saved"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token,
+      },
+      body: JSON.stringify({ kind, source_text: source, result }),
+    });
+    const payload = await readJson(response);
+    if (!response.ok) throw new Error(payload.error || "Could not save that draft.");
+    button.textContent = "Saved";
+    if (note) note.textContent = "Kept in your saved work.";
+  } catch (error) {
+    button.disabled = false;
+    if (note) note.textContent = error.message;
+  }
 }
 
 function paintProgress(value, label) {
   const shown = Math.max(0, Math.min(100, Math.round(value)));
-  progressRing.style.setProperty("--p", String(shown));
-  progressPct.textContent = `${shown}%`;
-  progressLabel.textContent = label;
+  if (progressBar) progressBar.style.width = `${shown}%`;
+  if (progressTrack) progressTrack.setAttribute("aria-valuenow", String(shown));
+  if (progressPct) progressPct.textContent = `${shown}%`;
+  if (progressLabel) progressLabel.textContent = label;
+}
+
+function setBusyLabel(button, label) {
+  const node = button && button.querySelector(".btn-label");
+  if (!node) return;
+  if (!button.dataset.idleLabel) button.dataset.idleLabel = node.textContent;
+  node.textContent = label;
+  button.classList.add("is-busy");
+}
+
+function clearBusyLabel(button) {
+  const node = button && button.querySelector(".btn-label");
+  if (node && button.dataset.idleLabel) node.textContent = button.dataset.idleLabel;
+  if (button) button.classList.remove("is-busy");
 }
 
 function buttonsAvailable() {
   checkButton.disabled = !detectorReady;
   humanizeButton.disabled = !humanizerReady;
+  if (offerHumanize) offerHumanize.disabled = !humanizerReady;
 }
 
 async function readStatus(path) {
@@ -260,9 +495,22 @@ async function waitUntilReady() {
   }
 }
 
-async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
+async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyButton) {
   checkButton.disabled = true;
   humanizeButton.disabled = true;
+  if (offerHumanize) offerHumanize.disabled = true;
+  setBusyLabel(busyButton, "Processing");
+  if (reportEmpty) reportEmpty.hidden = true;
+  if (reportBody) reportBody.hidden = true;
+  if (rewriteBody) rewriteBody.hidden = true;
+  const scoreMore = document.querySelector("#score-more");
+  if (scoreMore) scoreMore.hidden = true;
+  const readingMore = document.querySelector("#reading-more");
+  const marked = document.querySelector("#marked-text");
+  const rewriteText = document.querySelector("#rewrite-text");
+  if (readingMore) readingMore.hidden = true;
+  if (marked) marked.hidden = true;
+  if (rewriteText) rewriteText.hidden = true;
   progress.hidden = false;
   let shown = 4;
   let target = 8;
@@ -326,10 +574,17 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
   } finally {
     window.clearInterval(timer);
     progress.hidden = true;
+    clearBusyLabel(checkButton);
+    clearBusyLabel(humanizeButton);
+    clearBusyLabel(offerHumanize);
+    if (reportEmpty && reportBody && rewriteBody && reportBody.hidden && rewriteBody.hidden) {
+      reportEmpty.hidden = false;
+    }
     buttonsAvailable();
   }
 }
 
+if (draft) {
 checkButton.addEventListener("click", () => {
   if (selectedPdf() || (fileInput.files.length > 0 && words(draft.value) < 20)) {
     const form = new FormData();
@@ -341,23 +596,26 @@ checkButton.addEventListener("click", () => {
         return;
       }
       showReport(result);
-    });
+    }, checkButton);
     return;
   }
   const textBody = new URLSearchParams();
   textBody.set("text", draft.value);
-  runJob(appPath("/api/analyze"), textBody, true, "Reviewing the draft", "Opening the review", showReport);
+  runJob(appPath("/api/analyze"), textBody, true, "Reviewing the draft", "Opening the review", showReport, checkButton);
 });
 
-humanizeButton.addEventListener("click", () => {
+function startHumanize(busyButton) {
   if (words(draft.value) < 8) {
     window.alert("Paste a paragraph to humanize.");
     return;
   }
   const textBody = new URLSearchParams();
   textBody.set("text", draft.value);
-  runJob(appPath("/api/humanize"), textBody, true, "Rewriting the draft", "Rewrite ready", showRewrite);
-});
+  runJob(appPath("/api/humanize"), textBody, true, "Rewriting the draft", "Rewrite ready", showRewrite, busyButton);
+}
+
+humanizeButton.addEventListener("click", () => startHumanize(humanizeButton));
+if (offerHumanize) offerHumanize.addEventListener("click", () => startHumanize(offerHumanize));
 
 document.querySelector("#copy").addEventListener("click", async () => {
   const copy = document.querySelector("#copy");
@@ -379,22 +637,32 @@ document.querySelector("#check-rewrite").addEventListener("click", () => {
 });
 
 const upload = document.querySelector("#upload");
-const uploadTitle = document.querySelector("#upload-title");
-const fileHint = "A PDF opens as a marked report you can download.";
 
 function showChosenFile(file) {
+  if (!upload) return;
   if (!file) {
     upload.classList.remove("has-file");
-    uploadTitle.textContent = "Upload a PDF, Word file, or .txt";
-    fileName.textContent = fileHint;
+    if (uploadLabel) uploadLabel.textContent = "Upload";
     return;
   }
   upload.classList.add("has-file");
-  uploadTitle.textContent = file.name;
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".pdf")) fileName.textContent = "This PDF will open as a marked report.";
-  else if (lower.endsWith(".txt")) fileName.textContent = "The text is in the box above. You can still edit it.";
-  else fileName.textContent = "Check for AI will score this file.";
+  if (uploadLabel) uploadLabel.textContent = file.name;
+}
+
+function setPasteMode(mode) {
+  const checking = mode !== "humanize";
+  const modeCheck = document.querySelector("#mode-check");
+  const modeHumanize = document.querySelector("#mode-humanize");
+  if (modeCheck) {
+    modeCheck.classList.toggle("is-selected", checking);
+    modeCheck.setAttribute("aria-pressed", checking ? "true" : "false");
+  }
+  if (modeHumanize) {
+    modeHumanize.classList.toggle("is-selected", !checking);
+    modeHumanize.setAttribute("aria-pressed", checking ? "false" : "true");
+  }
+  if (checkButton) checkButton.hidden = !checking;
+  if (humanizeButton) humanizeButton.hidden = checking;
 }
 
 fileInput.addEventListener("change", async () => {
@@ -456,10 +724,44 @@ document.querySelector("#sample-ai").addEventListener("click", () => {
 });
 
 draft.addEventListener("keydown", (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !checkButton.disabled) {
-    checkButton.click();
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    const active = humanizeButton && !humanizeButton.hidden ? humanizeButton : checkButton;
+    if (active && !active.disabled) active.click();
   }
 });
 
+const modeCheck = document.querySelector("#mode-check");
+const modeHumanize = document.querySelector("#mode-humanize");
+if (modeCheck) modeCheck.addEventListener("click", () => setPasteMode("check"));
+if (modeHumanize) modeHumanize.addEventListener("click", () => setPasteMode("humanize"));
+
+const clearDraft = document.querySelector("#clear-draft");
+if (clearDraft) {
+  clearDraft.addEventListener("click", () => {
+    draft.value = "";
+    fileInput.value = "";
+    showChosenFile(null);
+    refreshCount();
+  });
+}
+
+const saveCheck = document.querySelector("#save-check");
+if (saveCheck && saveCheck.tagName === "BUTTON") {
+  saveCheck.addEventListener("click", () => {
+    const source = sourceFor(lastCheck || {});
+    if (!lastCheck || !source) return;
+    storeWork(saveCheck, document.querySelector("#save-check-note"), "check", source, lastCheck);
+  });
+}
+const saveRewrite = document.querySelector("#save-rewrite");
+if (saveRewrite && saveRewrite.tagName === "BUTTON") {
+  saveRewrite.addEventListener("click", () => {
+    const source = (draft.value || "").trim();
+    if (!lastRewrite || !source) return;
+    storeWork(saveRewrite, document.querySelector("#save-rewrite-note"), "rewrite", source, lastRewrite);
+  });
+}
+
 refreshCount();
 waitUntilReady();
+}

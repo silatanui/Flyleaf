@@ -63,19 +63,6 @@ class Humanizer:
             _download_humanizer()
         return LOCAL_DIR, "", MODEL_ID
 
-
-def _download_humanizer() -> None:
-    """Download one file at a time. snapshot_download opens a thread pool, and this host rejects that."""
-    from huggingface_hub import hf_hub_download, list_repo_files
-
-    destination = ROOT / "models" / "humanizer"
-    destination.mkdir(parents=True, exist_ok=True)
-    names = [name for name in list_repo_files(MODEL_ID) if name.startswith("en/") and not name.endswith("/")]
-    if not names:
-        raise RuntimeError("The humanizer model has no English files to download.")
-    for name in names:
-        hf_hub_download(repo_id=MODEL_ID, filename=name, local_dir=str(destination))
-
     def rewrite(self, text: str, progress=None) -> dict:
         cleaned = text.strip()
         total_words = word_count(cleaned)
@@ -85,24 +72,29 @@ def _download_humanizer() -> None:
             raise ValueError(f"Keep the draft under {MAX_WORDS} words. This one has {total_words}.")
 
         paragraphs = [part.strip() for part in re.split(r"\n\s*\n", cleaned) if part.strip()]
-        pieces = [piece for paragraph in paragraphs for piece in _pieces(paragraph)]
+        grouped = [_pieces(paragraph) for paragraph in paragraphs]
+        piece_count = sum(len(group) for group in grouped) or 1
+        steps = piece_count + 2
         if progress:
-            progress(0, max(len(pieces), 1))
+            progress(0, steps)
 
         rewritten: list[str] = []
-        cursor = 0
+        done = 0
         with self._lock:
-            for paragraph in paragraphs:
-                lines = []
-                for piece in _pieces(paragraph):
-                    lines.append(piece if word_count(piece) < 8 else self._one(piece))
-                    cursor += 1
-                    if progress:
-                        progress(cursor, len(pieces))
+            for group in grouped:
+                lines = self._batch(group)
                 rewritten.append(" ".join(line for line in lines if line))
+                done += len(group)
+                if progress:
+                    progress(done, steps)
         body = "\n\n".join(part for part in rewritten if part)
+        chosen = body if word_count(body) >= max(8, total_words // 2) else loosen(body)
         before = _reading(cleaned)
-        chosen, after = _lower_reading(cleaned, [loosen(body), loosen(cleaned), body], total_words)
+        if progress:
+            progress(done + 1, steps)
+        after = _reading(chosen)
+        if progress:
+            progress(steps, steps)
         return {
             "text": chosen,
             "word_count": word_count(chosen),
@@ -116,31 +108,51 @@ def _download_humanizer() -> None:
             "model": self.model_name,
         }
 
-    def _one(self, text: str) -> str:
+    def _batch(self, pieces: list[str]) -> list[str]:
+        """Rewrite a paragraph in one pass. Greedy decoding stays fast on one CPU thread."""
+        results = list(pieces)
+        pending = [index for index, piece in enumerate(pieces) if word_count(piece) >= 8]
+        if not pending or self._model is None or self._tokenizer is None:
+            return results
+        prompts = [f"{self._prefix}{pieces[index]}" for index in pending]
         encoded = self._tokenizer(
-            f"{self._prefix}{text}",
+            prompts,
             return_tensors="pt",
             truncation=True,
-            max_length=256,
+            max_length=128,
+            padding=True,
         )
         input_ids = encoded["input_ids"].to(self._device)
         attention_mask = encoded["attention_mask"].to(self._device)
+        longest = int(attention_mask.sum(dim=1).max().item())
+        max_new = min(64, max(24, longest))
         with torch.inference_mode():
             output = self._model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                max_new_tokens=96,
-                num_beams=5,
-                num_return_sequences=5,
-                early_stopping=True,
-                no_repeat_ngram_size=3,
-                repetition_penalty=2.5,
+                max_new_tokens=max_new,
+                num_beams=1,
+                do_sample=False,
             )
-        candidates = [
-            re.sub(r"\s+", " ", self._tokenizer.decode(row, skip_special_tokens=True)).strip()
-            for row in output
-        ]
-        return _choose(text, candidates)
+        for row, index in zip(output, pending):
+            text = re.sub(r"\s+", " ", self._tokenizer.decode(row, skip_special_tokens=True)).strip()
+            if text.lower().startswith("paraphrase:"):
+                text = text.split(":", 1)[1].strip()
+            results[index] = _restore_caps(text) or pieces[index]
+        return results
+
+
+def _download_humanizer() -> None:
+    """Download one file at a time. snapshot_download opens a thread pool, and this host rejects that."""
+    from huggingface_hub import hf_hub_download, list_repo_files
+
+    destination = ROOT / "models" / "humanizer"
+    destination.mkdir(parents=True, exist_ok=True)
+    names = [name for name in list_repo_files(MODEL_ID) if name.startswith("en/") and not name.endswith("/")]
+    if not names:
+        raise RuntimeError("The humanizer model has no English files to download.")
+    for name in names:
+        hf_hub_download(repo_id=MODEL_ID, filename=name, local_dir=str(destination))
 
 
 def _has_weights(folder: Path, minimum: int) -> bool:

@@ -7,10 +7,11 @@
   <meta name="theme-color" content="#0057B8">
   <title>{% block title %}Flyleaf{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}?v=16" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=27">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=38">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-signed-in="{{ '1' if account else '0' }}">
   <header class="nav">
     <a class="logo" href="{{ url_for('home') }}">
       <span class="logo-name">Fly</span>
@@ -22,9 +23,30 @@
       <a href="{{ url_for('home') }}#scores">Scores</a>
       <a href="{{ url_for('home') }}#about">About</a>
       <a href="{{ url_for('check') }}">Check for AI</a>
+      {% if account %}
+      <a href="{{ url_for('saved_list') }}">Saved</a>
+      {% if account.role == 'admin' %}<a href="{{ url_for('admin_page') }}">Admin</a>{% endif %}
+      {% endif %}
     </nav>
-    <a class="nav-cta" href="{{ url_for('check') }}">Try the tool</a>
+    {% if account %}
+    <form class="nav-logout" method="post" action="{{ url_for('logout') }}">
+      <span class="nav-user">{{ account.display_name }}</span>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="nav-cta" type="submit">Log out</button>
+    </form>
+    {% else %}
+    <a class="nav-cta" href="{{ url_for('login') }}">Log in</a>
+    {% endif %}
   </header>
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+  <div class="flash-wrap">
+    {% for message in messages %}
+    <p class="flash">{{ message }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
   {% block body %}{% endblock %}
   <footer class="site-footer">
     <div class="footer-grid">
@@ -45,7 +67,7 @@
       <div>
         <h2>The project</h2>
         <a href="{{ url_for('home') }}#about">Tanui Kipngetich Sila</a>
-        <p>Portfolio project. Free for anyone. No account.</p>
+        <p>Portfolio project. Free to try. Sign in to keep a draft.</p>
       </div>
       <div>
         <h2>A careful note</h2>

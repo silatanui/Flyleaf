@@ -2,98 +2,139 @@
 {% block title %}Check for AI, Flyleaf{% endblock %}
 {% block body %}
 <main class="check-main">
-  <div class="workspace">
+  <header class="check-intro">
+    <p class="eyebrow">Free for anyone</p>
+    <h1>Check for AI</h1>
+    <p>Paste English prose, or upload a PDF, Word, or text file. A PDF opens as a marked report. Sign in if you want to keep the reading.</p>
+    <p id="model-state" class="state">Starting…</p>
+  </header>
+  <div class="workspace check-layout">
     <section class="panel write">
-      <div class="panel-head">
-        <p class="eyebrow">Free for anyone</p>
-        <h1>Check for AI</h1>
-        <p>Paste English prose, or upload a PDF, Word, or text file. A PDF opens as a marked report.</p>
-        <p id="model-state" class="state">Starting…</p>
+      <div class="mode-row" role="toolbar" aria-label="What to do with the draft">
+        <button id="mode-check" type="button" class="mode-option is-selected" aria-pressed="true">Check for AI</button>
+        <button id="mode-humanize" type="button" class="mode-option" aria-pressed="false">Humanize</button>
+        <button id="sample-human" type="button" class="mode-option">Human sample</button>
+        <button id="sample-ai" type="button" class="mode-option">AI-style sample</button>
+        <label class="mode-option" id="upload">
+          <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+          <span id="upload-label">Upload</span>
+        </label>
       </div>
       <textarea id="draft" rows="14" placeholder="Paste a paragraph or a full essay…"></textarea>
-      <label class="upload" id="upload">
-        <input id="file" type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-        <span class="upload-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 16 V5"></path>
-            <path d="M8 9 L12 5 L16 9"></path>
-            <path d="M5 19 H19"></path>
+      <div class="paste-foot">
+        <span id="word-count" class="count">0 words</span>
+        <button id="clear-draft" type="button" class="clear-draft" aria-label="Delete the draft">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7 H19"></path>
+            <path d="M9 7 V5 H15 V7"></path>
+            <path d="M8 7 L9 19 H15 L16 7"></path>
           </svg>
-        </span>
-        <span class="upload-copy">
-          <strong id="upload-title">Upload a PDF, Word file, or .txt</strong>
-          <span id="file-name">A PDF opens as a marked report you can download.</span>
-        </span>
-      </label>
-      <div class="actions">
-        <button id="check" type="button" class="with-icon" disabled>
+        </button>
+        <button id="check" type="button" class="with-icon paste-go" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="10" cy="10" r="6"></circle>
             <path d="M14.5 14.5 L20 20"></path>
           </svg>
-          Check for AI
+          <span class="btn-label">Check</span>
         </button>
-        <button id="humanize" type="button" class="with-icon secondary" disabled>
+        <button id="humanize" type="button" class="with-icon paste-go" hidden disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 20 L9 18 L19 8 L15 4 L5 14 Z"></path>
             <path d="M13 6 L17 10"></path>
           </svg>
-          Humanize text
+          <span class="btn-label">Humanize</span>
         </button>
-        <button id="sample-human" type="button" class="ghost">Human sample</button>
-        <button id="sample-ai" type="button" class="ghost">AI-style sample</button>
-        <span id="word-count" class="count">0 words</span>
       </div>
     </section>
 
     <section id="report" class="panel report">
-      <div id="report-empty" class="empty-report">
-        <p class="eyebrow">Result</p>
-        <h2>The reading lands here</h2>
-        <p>Check for AI uses a semicircle, like a speedometer. The needle is the share classified as AI-like. Inconclusive lines stay beside it, not inside it.</p>
+      <div id="report-empty" class="result-sheet">Results will be shown here.</div>
+
+      <div id="progress" class="side-progress" hidden>
+        <p class="side-progress-title">
+          <span class="process-mark" aria-hidden="true"></span>
+          Processing
+        </p>
+        <div class="bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
+          <div id="progress-bar" class="bar-fill"></div>
+        </div>
+        <div class="bar-meta">
+          <span id="progress-label">Reviewing the draft</span>
+          <strong id="progress-pct">0%</strong>
+        </div>
       </div>
 
       <div id="report-body" hidden>
-        <div id="donut" class="donut"></div>
-        <p id="donut-blurb" class="donut-blurb"></p>
-        <p id="confidence-line" class="meter-note donut-note"></p>
-        <ul id="warnings" class="warnings"></ul>
-        <div class="legend">
-          <span class="swatch ai">AI-like</span>
-          <span class="swatch uncertain">Uncertain</span>
-          <span class="swatch human">Human-like</span>
+        <div class="highlight-slot result-sheet">
+          <article id="essay" class="essay"></article>
         </div>
-        <article id="essay" class="essay"></article>
-        <p class="footnote">The needle is only the share classified as AI-like. Inconclusive is the separate number on the right. Cyan highlights were classified as AI-like. Purple highlights were inconclusive. The result is an estimate, not a finding.</p>
+        <div class="highlight-foot">
+          <button id="offer-humanize" type="button" class="with-icon offer-humanize" hidden disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 L13.6 8.4 L19 10 L13.6 11.6 L12 17 L10.4 11.6 L5 10 L10.4 8.4 Z"></path>
+              <path d="M18 15 L18.7 17.3 L21 18 L18.7 18.7 L18 21 L17.3 18.7 L15 18 L17.3 17.3 Z"></path>
+            </svg>
+            <span class="btn-label">Humanize</span>
+          </button>
+        </div>
       </div>
 
       <div id="rewrite-body" hidden>
+        <div class="highlight-slot result-sheet">
+          <article id="rewrite" class="essay"></article>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section id="score-more" class="score-more" hidden>
+    <div id="report-score" class="panel score-card" hidden>
+      <div class="score-slot">
+        <div id="donut" class="donut"></div>
+      </div>
+      <div class="score-copy">
+        <p id="donut-blurb" class="donut-blurb"></p>
+        <ul id="warnings" class="warnings"></ul>
+        <div class="legend">
+          <span class="swatch human">Human-like</span>
+          <span class="swatch uncertain">Inconclusive</span>
+          <span class="swatch ai">AI-like</span>
+        </div>
+        <div class="actions save-row">
+          {% if account %}
+          <button id="save-check" type="button" class="ghost">Save this check</button>
+          {% else %}
+          <a class="button ghost" href="{{ url_for('login', next='/check') }}">Sign in to save this check</a>
+          {% endif %}
+          <span id="save-check-note" class="save-note"></span>
+        </div>
+      </div>
+    </div>
+    <div id="rewrite-score" class="panel score-card" hidden>
+      <div class="score-slot">
         <div class="donut-pair">
           <div id="before-donut" class="donut"></div>
           <div id="after-donut" class="donut"></div>
         </div>
+      </div>
+      <div class="score-copy">
         <p id="pair-blurb" class="donut-blurb"></p>
-        <article id="rewrite" class="essay"></article>
         <div class="actions">
           <button id="copy" type="button" class="ghost">Copy</button>
           <button id="check-rewrite" type="button" class="ghost">Check this rewrite</button>
+          {% if account %}
+          <button id="save-rewrite" type="button" class="ghost">Save this rewrite</button>
+          {% else %}
+          <a class="button ghost" href="{{ url_for('login', next='/check') }}">Sign in to save this rewrite</a>
+          {% endif %}
+          <span id="save-rewrite-note" class="save-note"></span>
         </div>
-        <p class="footnote">Before and after use the same AI-like headline as Check for AI. Inconclusive stays a separate number. A lower headline means less of the rewrite was classified as AI-like.</p>
+        <p class="footnote">A lower AI-like number means less of the rewrite was classified as AI-like. The draft still needs a human review.</p>
       </div>
-    </section>
-  </div>
-</main>
-
-<div id="progress" class="progress" hidden>
-  <div class="progress-card">
-    <div class="ring" id="progress-ring">
-      <span id="progress-pct">0%</span>
     </div>
-    <p id="progress-label">Reviewing the draft</p>
-    <p class="progress-note">Flyleaf is working on this computer.</p>
-  </div>
-</div>
+  </section>
+</main>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/app.js') }}?v=22"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=29"></script>
 {% endblock %}

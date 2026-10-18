@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Accounts, Flyleaf{% endblock %}
+{% block body %}
+<main class="library">
+  <p class="eyebrow">Admin</p>
+  <h1>Accounts on this computer</h1>
+  <p class="lede">These accounts exist only in the local database. A person sees their own saved drafts. You can open any of them.</p>
+  <div class="table-wrap">
+    <table class="account-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Saved</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in people %}
+        <tr>
+          <td><a href="{{ url_for('admin_user', user_id=person.id) }}">{{ person.display_name }}</a></td>
+          <td>{{ person.email }}</td>
+          <td>{{ person.role }}</td>
+          <td>{{ person.saved_count }}</td>
+          <td>{{ person.created_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}
