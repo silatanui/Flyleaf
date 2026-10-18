@@ -10,6 +10,10 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["RAYON_NUM_THREADS"] = "1"
+# Prefer on-disk weights. Do not try Hugging Face downloads on cPanel.
+os.environ.setdefault("FLYLEAF_OFFLINE", "1")
+# Never load the ~900 MB paraphraser unless the host admin opts in.
+os.environ.setdefault("FLYLEAF_USE_PARAPHRASER", "0")
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:

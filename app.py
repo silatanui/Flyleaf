@@ -669,6 +669,7 @@ def _start_similarity_load() -> None:
 
 
 _start_model_load()
+_start_similarity_load()
 
 
 if __name__ == "__main__":

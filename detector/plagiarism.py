@@ -27,6 +27,27 @@ ROOT = Path(__file__).resolve().parent.parent
 CACHE_DIR = ROOT / "models"
 MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 LOCAL_DIR = CACHE_DIR / "minilm"
+HUB_DIR = CACHE_DIR / "models--sentence-transformers--all-MiniLM-L6-v2" / "snapshots"
+
+
+def _similarity_source() -> tuple[str, bool]:
+    """Prefer a local copy so the host does not wait on Hugging Face."""
+    if (LOCAL_DIR / "config.json").is_file():
+        return str(LOCAL_DIR), True
+    if HUB_DIR.is_dir():
+        snaps = sorted(
+            (path for path in HUB_DIR.iterdir() if path.is_dir() and (path / "config.json").is_file()),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if snaps:
+            return str(snaps[0]), True
+    offline = os.environ.get("FLYLEAF_OFFLINE", "").strip().lower() in {"1", "true", "yes"}
+    if offline:
+        raise FileNotFoundError(
+            "Similarity weights are missing. Upload models/minilm, then restart."
+        )
+    return MODEL_ID, False
 PASSAGE_WORDS = 100
 MAX_QUERIES = 16
 MAX_SOURCES = 16
@@ -356,8 +377,7 @@ class SimilarityChecker:
     def load(self) -> None:
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            source = str(LOCAL_DIR) if (LOCAL_DIR / "config.json").is_file() else MODEL_ID
-            local_only = source == str(LOCAL_DIR)
+            source, local_only = _similarity_source()
             self._tokenizer = AutoTokenizer.from_pretrained(
                 source,
                 local_files_only=local_only,
@@ -367,14 +387,24 @@ class SimilarityChecker:
                 source,
                 local_files_only=local_only,
                 cache_dir=str(CACHE_DIR),
-                low_cpu_mem_usage=False,
+                low_cpu_mem_usage=True,
             )
             self._model.eval()
             self.status = "ready"
             self.error = None
         except Exception as exc:
             self.status = "error"
-            self.error = str(exc)
+            text = str(exc)
+            lowered = text.lower()
+            if "local_files_only" in lowered or "not found" in lowered or "no such file" in lowered:
+                self.error = (
+                    "Similarity weights are missing on the server. "
+                    "Upload models/minilm or the Hugging Face MiniLM cache, then restart."
+                )
+            elif "out of memory" in lowered or "oom" in lowered:
+                self.error = "Not enough memory to load the similarity model on this host."
+            else:
+                self.error = text
             raise
 
     def _embed(self, texts: list[str]) -> torch.Tensor:

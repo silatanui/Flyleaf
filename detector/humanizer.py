@@ -1,12 +1,13 @@
 """Rewrite stiff English into plainer sentences.
 
-The weights prefer humarin/chatgpt_paraphraser_on_T5_base, a public T5
-paraphraser. Lynote/humanize-text-model is the fallback. A rewrite is still
-a draft to review. It does not hide how the text was written.
+Default weights are Lynote/humanize-text-model (~230 MB), which fits shared
+hosts. The larger humarin T5 paraphraser is optional via
+FLYLEAF_USE_PARAPHRASER=1. A rewrite is still a draft to review.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import threading
 from pathlib import Path
@@ -38,30 +39,53 @@ class Humanizer:
         self.model_name = MODEL_ID
 
     def load(self) -> None:
-        try:
-            folder, prefix, name = self._source()
-            self._tokenizer = T5Tokenizer.from_pretrained(str(folder), local_files_only=True)
-            self._model = T5ForConditionalGeneration.from_pretrained(
-                str(folder),
-                local_files_only=True,
-                low_cpu_mem_usage=False,
-            )
-            self._model.to(self._device)
-            self._model.eval()
-            self._prefix = prefix
-            self.model_name = name
-            self.status = "ready"
-        except Exception as exc:
-            self.status = "error"
-            self.error = str(exc)
-            raise
+        last_error: Exception | None = None
+        for folder, prefix, name in self._candidates():
+            try:
+                self._load_folder(folder, prefix, name)
+                return
+            except Exception as exc:
+                last_error = exc
+                self._model = None
+                self._tokenizer = None
+        self.status = "error"
+        self.error = _friendly_error(last_error)
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(self.error or "The humanizer failed to load.")
 
-    def _source(self) -> tuple[Path, str, str]:
-        if _has_weights(PARAPHRASE_DIR, 800_000_000):
-            return PARAPHRASE_DIR, "paraphrase: ", PARAPHRASE_ID
-        if not _has_weights(LOCAL_DIR, 60_000_000):
+    def _load_folder(self, folder: Path, prefix: str, name: str) -> None:
+        if not folder.is_dir():
+            raise FileNotFoundError(f"Missing humanizer folder: {folder}")
+        self._tokenizer = T5Tokenizer.from_pretrained(str(folder), local_files_only=True)
+        self._model = T5ForConditionalGeneration.from_pretrained(
+            str(folder),
+            local_files_only=True,
+            low_cpu_mem_usage=True,
+        )
+        self._model.to(self._device)
+        self._model.eval()
+        self._prefix = prefix
+        self.model_name = name
+        self.status = "ready"
+        self.error = None
+
+    def _candidates(self) -> list[tuple[Path, str, str]]:
+        """Prefer the smaller Lynote weights on shared hosts."""
+        want_big = os.environ.get("FLYLEAF_USE_PARAPHRASER", "").strip().lower() in {"1", "true", "yes"}
+        offline = os.environ.get("FLYLEAF_OFFLINE", "").strip().lower() in {"1", "true", "yes"}
+        options: list[tuple[Path, str, str]] = []
+        if want_big and _has_weights(PARAPHRASE_DIR, 800_000_000):
+            options.append((PARAPHRASE_DIR, "paraphrase: ", PARAPHRASE_ID))
+        if _has_weights(LOCAL_DIR, 60_000_000):
+            options.append((LOCAL_DIR, "", MODEL_ID))
+        elif not offline:
             _download_humanizer()
-        return LOCAL_DIR, "", MODEL_ID
+            if _has_weights(LOCAL_DIR, 60_000_000):
+                options.append((LOCAL_DIR, "", MODEL_ID))
+        # Never fall back to the ~900 MB paraphraser on shared hosts.
+        # It often OOMs on cPanel; only load it when explicitly requested.
+        return options
 
     def rewrite(self, text: str, progress=None) -> dict:
         cleaned = text.strip()
@@ -151,6 +175,32 @@ def _has_weights(folder: Path, minimum: int) -> bool:
         if path.exists() and path.stat().st_size >= minimum:
             return True
     return False
+
+
+def _friendly_error(exc: Exception | None) -> str:
+    text = str(exc or "").strip()
+    lowered = text.lower()
+    if isinstance(exc, MemoryError) or "out of memory" in lowered or "oom" in lowered:
+        return (
+            "Not enough memory for the humanizer on this host. "
+            "Upload models/humanizer/en (~230 MB) and do not enable FLYLEAF_USE_PARAPHRASER."
+        )
+    if "local_files_only" in lowered or "can't load" in lowered or "no such file" in lowered or "not found" in lowered:
+        return (
+            "Humanizer weights are missing on the server. "
+            "Upload the models/humanizer/en folder from your local project (~230 MB), then restart the app."
+        )
+    if "protobuf" in lowered or "sentencepiece" in lowered:
+        return (
+            "The humanizer tokenizer could not load. "
+            "Install protobuf and sentencepiece in the cPanel virtualenv, then restart."
+        )
+    if "connection" in lowered or "timed out" in lowered or "huggingface" in lowered:
+        return (
+            "The host could not download the humanizer. "
+            "Upload models/humanizer/en over SFTP instead of downloading on the server."
+        )
+    return text or "The humanizer failed to load."
 
 
 def _choose(source: str, candidates: list[str]) -> str:

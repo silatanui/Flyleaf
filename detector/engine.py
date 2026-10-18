@@ -251,14 +251,15 @@ class Detector:
                 source,
                 local_files_only=local_only,
                 cache_dir=str(CACHE_DIR),
-                low_cpu_mem_usage=False,
+                low_cpu_mem_usage=True,
             )
             self._model.to(self._device)
             self._model.eval()
             self.status = "ready"
+            self.error = None
         except Exception as exc:
             self.status = "error"
-            self.error = str(exc)
+            self.error = _friendly_detector_error(exc)
             raise
 
     def _probabilities(self, texts: list[str]) -> list[float]:
@@ -371,6 +372,27 @@ class Detector:
             ],
             "model": MODEL_ID,
         }
+
+
+def _friendly_detector_error(exc: Exception) -> str:
+    text = str(exc)
+    lowered = text.lower()
+    if "out of memory" in lowered or "oom" in lowered:
+        return (
+            "Not enough memory for the AI checker on this host. "
+            "Upload models/desklib and keep only one worker process if you can."
+        )
+    if "local_files_only" in lowered or "not found" in lowered or "no such file" in lowered:
+        return (
+            "AI checker weights are missing on the server. "
+            "Upload models/desklib from your local project, then restart."
+        )
+    if "timed out" in lowered or "connection" in lowered or "huggingface" in lowered:
+        return (
+            "The host could not download the AI checker. "
+            "Upload models/desklib over SFTP instead of downloading on the server."
+        )
+    return text or "The AI checker failed to load."
 
 
 detector = Detector()

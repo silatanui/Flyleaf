@@ -602,6 +602,13 @@ async function readStatus(path) {
   return response.json();
 }
 
+function shortToolError(prefix, detail) {
+  const note = String(detail || "").replace(/\s+/g, " ").trim();
+  if (!note) return prefix;
+  const clipped = note.length > 160 ? `${note.slice(0, 157)}...` : note;
+  return `${prefix} ${clipped}`;
+}
+
 async function pollReady() {
   const detector = await readStatus("/api/status");
   let human = { status: "loading", error: null };
@@ -624,19 +631,33 @@ async function pollReady() {
   } else if (detector.status === "error") {
     modelState.textContent = detector.error || "Flyleaf failed to load.";
   } else if (detectorReady && human.status === "error" && similar.status === "error") {
-    modelState.textContent = "Check for AI is ready. Humanize and Similarity could not load.";
+    modelState.textContent = shortToolError(
+      "Check for AI is ready. Humanize and Similarity could not load.",
+      human.error || similar.error,
+    );
   } else if (detectorReady && human.status === "error") {
-    modelState.textContent = similarityReady
-      ? "Check for AI and Similarity are ready. The humanizer failed to load."
-      : "Check for AI is ready. The humanizer failed to load.";
+    modelState.textContent = shortToolError(
+      similarityReady
+        ? "Check for AI and Similarity are ready. The humanizer failed to load."
+        : "Check for AI is ready. The humanizer failed to load.",
+      human.error,
+    );
   } else if (detectorReady && similar.status === "error") {
-    modelState.textContent = humanizerReady
-      ? "Check for AI and Humanize are ready. Similarity failed to load."
-      : "Check for AI is ready. Similarity failed to load.";
+    modelState.textContent = shortToolError(
+      humanizerReady
+        ? "Check for AI and Humanize are ready. Similarity failed to load."
+        : "Check for AI is ready. Similarity failed to load.",
+      similar.error,
+    );
   } else if (detectorReady && humanizerReady && similarityReady) {
     modelState.textContent = "Ready · English · free to use";
   } else if (detectorReady) {
-    modelState.textContent = "Check for AI is ready. Other tools are still loading...";
+    const waiting = [];
+    if (!humanizerReady) waiting.push("Humanize");
+    if (!similarityReady) waiting.push("Similarity");
+    modelState.textContent = waiting.length
+      ? `Check for AI is ready. Still loading ${waiting.join(" and ")}...`
+      : "Check for AI is ready.";
   } else {
     modelState.textContent = "Flyleaf is getting ready...";
   }

@@ -59,7 +59,7 @@
 {% endblock %}
 {% block scripts %}
 {% if item.kind != 'pdf' %}
-<script src="{{ url_for('static', filename='js/app.js') }}?v=24"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=45"></script>
 <script>
   const payload = JSON.parse(document.querySelector("#saved-payload").textContent);
   if (document.querySelector("#rewrite")) showRewrite(payload);
