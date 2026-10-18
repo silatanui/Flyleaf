@@ -269,8 +269,8 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
   let finished = false;
   paintProgress(shown, workingLabel);
   const timer = window.setInterval(() => {
-    const ceiling = finished ? 100 : 92;
-    target = Math.min(ceiling, Math.max(target, shown + 0.6));
+    const ceiling = finished ? 100 : 90;
+    target = Math.min(ceiling, target);
     shown += (target - shown) * 0.12;
     paintProgress(shown, finished ? doneLabel : workingLabel);
   }, 80);
@@ -293,16 +293,25 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone) {
     if (payload.status === "error") throw new Error(payload.error || "The job could not be finished.");
 
     const started = Date.now();
+    let lastBeat = Date.now();
+    let lastUpdated = 0;
     const watchUrl = payload.watch_url || appPath(`/api/jobs/${payload.job_id}`);
     for (;;) {
-      if (Date.now() - started > 180000) {
-        throw new Error("The check is taking too long. Wait a minute and try a shorter passage.");
+      if (Date.now() - lastBeat > 90000) {
+        throw new Error("The host stopped this check before it finished. Wait a minute and try again.");
       }
       await new Promise((resolve) => setTimeout(resolve, 700));
       let job = await readJob(watchUrl);
       if (!job) job = await readJob(appPath(`/api/jobs/${payload.job_id}`));
       if (!job) continue;
-      if (typeof job.percent === "number") target = Math.max(target, job.percent);
+      if (typeof job.updated === "number" && job.updated !== lastUpdated) {
+        lastUpdated = job.updated;
+        lastBeat = Date.now();
+      }
+      if (Date.now() - started > 900000) {
+        throw new Error("This reading is still going. Leave the page open a little longer.");
+      }
+      if (typeof job.percent === "number") target = Math.max(6, job.percent);
       if (job.status === "done") {
         finished = true;
         target = 100;

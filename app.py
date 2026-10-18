@@ -14,6 +14,7 @@ import io
 import json
 import re
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -70,6 +71,20 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
             job["message"] = "Reviewing the draft"
         _publish_job(job_id)
 
+    stop_heartbeat = threading.Event()
+
+    def heartbeat() -> None:
+        while not stop_heartbeat.wait(5):
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+                if job is None or job.get("status") in {"done", "error"}:
+                    return
+            _publish_job(job_id)
+
+    try:
+        threading.Thread(target=heartbeat, daemon=True).start()
+    except RuntimeError:
+        pass
     try:
         result = detector.score(text, progress=progress)
         if pdf_bytes is not None:
@@ -108,6 +123,8 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
             _jobs[job_id]["error"] = str(exc)
             _jobs[job_id]["message"] = "The review could not be finished"
         _publish_job(job_id)
+    finally:
+        stop_heartbeat.set()
 
 
 @app.get("/")
@@ -297,6 +314,7 @@ def _publish_job(job_id: str) -> None:
         job = _jobs.get(job_id)
         if job is None:
             return
+        job["updated"] = time.time()
         payload = dict(job)
     raw = json.dumps(payload)
     (JOB_DIR / f"{job_id}.json").write_text(raw, encoding="utf-8")
