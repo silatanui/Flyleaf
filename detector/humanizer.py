@@ -21,6 +21,8 @@ from detector.plain import loosen
 ROOT = Path(__file__).resolve().parent.parent
 PARAPHRASE_DIR = ROOT / "models" / "paraphraser"
 LOCAL_DIR = ROOT / "models" / "humanizer" / "en"
+# Small T5 SentencePiece files ship in-repo so hosts can load without a full SFTP of models/.
+BUNDLED_TOKENIZER = Path(__file__).resolve().parent / "t5_tokenizer"
 PARAPHRASE_ID = "humarin/chatgpt_paraphraser_on_T5_base"
 MODEL_ID = "Lynote/humanize-text-model"
 MAX_WORDS = 1800
@@ -57,7 +59,7 @@ class Humanizer:
     def _load_folder(self, folder: Path, prefix: str, name: str) -> None:
         if not folder.is_dir():
             raise FileNotFoundError(f"Missing humanizer folder: {folder}")
-        self._tokenizer = T5Tokenizer.from_pretrained(str(folder), local_files_only=True)
+        self._tokenizer = _load_tokenizer(folder)
         self._model = T5ForConditionalGeneration.from_pretrained(
             str(folder),
             local_files_only=True,
@@ -177,6 +179,65 @@ def _has_weights(folder: Path, minimum: int) -> bool:
     return False
 
 
+def _spiece_path(folder: Path) -> Path | None:
+    """Return a usable SentencePiece file from the model folder or the bundled copy."""
+    for candidate in (
+        folder / "spiece.model",
+        BUNDLED_TOKENIZER / "spiece.model",
+        PARAPHRASE_DIR / "spiece.model",
+    ):
+        if candidate.is_file() and candidate.stat().st_size >= 1000:
+            return candidate
+    return None
+
+
+def _tokenizer_sources(folder: Path) -> list[Path]:
+    """Prefer the model folder, then the in-repo T5 tokenizer, then paraphraser files."""
+    sources: list[Path] = []
+    for path in (folder, BUNDLED_TOKENIZER, PARAPHRASE_DIR):
+        if not path.is_dir():
+            continue
+        if (path / "spiece.model").is_file() or (path / "tokenizer.json").is_file():
+            if path not in sources:
+                sources.append(path)
+    return sources
+
+
+def _load_tokenizer(folder: Path):
+    """Load T5 SentencePiece without relying on a complete host-side models/ upload.
+
+    Newer sentencepiece builds raise \"Either model_file or model_proto must be
+    specified\" when transformers passes a missing vocab path, which is common
+    after a partial SFTP of models/humanizer/en.
+    """
+    last_error: Exception | None = None
+    for source in _tokenizer_sources(folder):
+        try:
+            return T5Tokenizer.from_pretrained(
+                str(source),
+                local_files_only=True,
+                legacy=True,
+            )
+        except Exception as exc:
+            last_error = exc
+    spiece = _spiece_path(folder)
+    if spiece is None:
+        raise FileNotFoundError(
+            "Missing spiece.model for the humanizer. "
+            "Pull the latest code (includes detector/t5_tokenizer) or upload spiece.model with the weights."
+        )
+    try:
+        # Explicit path: avoids sentencepiece 0.2 Load() with a None vocab_file.
+        return T5Tokenizer(vocab_file=str(spiece), legacy=True)
+    except Exception as exc:
+        last_error = exc
+    raise RuntimeError(
+        _friendly_error(last_error)
+        if last_error is not None
+        else "The humanizer tokenizer failed to load."
+    ) from last_error
+
+
 def _friendly_error(exc: Exception | None) -> str:
     text = str(exc or "").strip()
     lowered = text.lower()
@@ -184,6 +245,11 @@ def _friendly_error(exc: Exception | None) -> str:
         return (
             "Not enough memory for the humanizer on this host. "
             "Upload models/humanizer/en (~230 MB) and do not enable FLYLEAF_USE_PARAPHRASER."
+        )
+    if "model_file or model_proto" in lowered or "spiece" in lowered:
+        return (
+            "The humanizer tokenizer could not open SentencePiece. "
+            "Pull the latest code (detector/t5_tokenizer) and confirm sentencepiece is installed, then restart."
         )
     if "local_files_only" in lowered or "can't load" in lowered or "no such file" in lowered or "not found" in lowered:
         return (
