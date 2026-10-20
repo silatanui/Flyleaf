@@ -21,6 +21,7 @@ from pathlib import Path
 import torch
 from transformers import AutoModel, AutoTokenizer
 
+from detector.device import inference_device
 from detector.engine import split_sentences, word_count
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -349,6 +350,7 @@ def _literal_overlap(passage: str, source_text: str, n: int = 8) -> tuple[float,
 
 
 def _mean_pool(model, tokenizer, texts: list[str]) -> torch.Tensor:
+    device = next(model.parameters()).device
     encoded = tokenizer(
         texts,
         padding=True,
@@ -356,6 +358,7 @@ def _mean_pool(model, tokenizer, texts: list[str]) -> torch.Tensor:
         max_length=256,
         return_tensors="pt",
     )
+    encoded = {key: value.to(device) for key, value in encoded.items()}
     with torch.inference_mode():
         output = model(**encoded)
         mask = encoded["attention_mask"].unsqueeze(-1).expand(output.last_hidden_state.size()).float()
@@ -372,23 +375,28 @@ class SimilarityChecker:
         self.model_name = MODEL_ID
         self._tokenizer = None
         self._model = None
+        self._device = inference_device()
         self._lock = threading.Lock()
 
     def load(self) -> None:
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            self._device = inference_device()
             source, local_only = _similarity_source()
             self._tokenizer = AutoTokenizer.from_pretrained(
                 source,
                 local_files_only=local_only,
                 cache_dir=str(CACHE_DIR),
             )
+            # MiniLM is small (~90 MB). low_cpu_mem_usage can leave weights on the
+            # meta device and then inference fails with "cpu is not on ... meta".
             self._model = AutoModel.from_pretrained(
                 source,
                 local_files_only=local_only,
                 cache_dir=str(CACHE_DIR),
-                low_cpu_mem_usage=True,
+                low_cpu_mem_usage=False,
             )
+            self._model.to(self._device)
             self._model.eval()
             self.status = "ready"
             self.error = None
@@ -396,7 +404,12 @@ class SimilarityChecker:
             self.status = "error"
             text = str(exc)
             lowered = text.lower()
-            if "local_files_only" in lowered or "not found" in lowered or "no such file" in lowered:
+            if "meta" in lowered and "device" in lowered:
+                self.error = (
+                    "The similarity model did not finish loading onto the device. "
+                    "Restart the app and try again."
+                )
+            elif "local_files_only" in lowered or "not found" in lowered or "no such file" in lowered:
                 self.error = (
                     "Similarity weights are missing on the server. "
                     "Upload models/minilm or the Hugging Face MiniLM cache, then restart."

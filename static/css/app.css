@@ -2389,10 +2389,29 @@ html[data-theme="dark"] .bar-fill {
   .nav-dashboard { display: none; }
   .hero, .band, .about, .method-inner, .workspace, .check-layout, .intro { grid-template-columns: 1fr; }
   .check-layout { gap: 14px; }
+  /* One scroll owner on phones: the page. Nested Reading panes fight touch scroll. */
   .check-layout .write,
   .check-layout .report {
     height: auto;
-    min-height: 420px;
+    min-height: 0;
+    overflow: visible;
+  }
+  .check-layout .write {
+    min-height: 280px;
+  }
+  .write textarea {
+    flex: none;
+    height: 240px;
+    min-height: 200px;
+    max-height: 45vh;
+  }
+  .check-layout .result-sheet,
+  .highlight-slot,
+  .similarity-sheet.result-sheet {
+    overflow: visible;
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: none;
   }
   .check-layout .panel { border-radius: 16px; padding: 18px 16px 16px; }
   .score-card { grid-template-columns: 1fr; }
@@ -2509,7 +2528,11 @@ html[data-theme="dark"] .bar-fill {
   .hero-panel .check-main:has(.check-layout) { width: 100%; }
   .check-layout .write,
   .check-layout .report {
-    min-height: 380px;
+    min-height: 0;
+  }
+  .write textarea {
+    height: 220px;
+    min-height: 180px;
   }
   .score-slot { flex-basis: 148px; height: 148px; }
   .home .cards-section { padding: 32px 0 4px; }
@@ -2549,7 +2572,11 @@ html[data-theme="dark"] .bar-fill {
   }
   .home-lead h1 { font-size: clamp(28px, 9vw, 34px); }
   .check-layout .write,
-  .check-layout .report { min-height: 340px; }
+  .check-layout .report { min-height: 0; }
+  .write textarea {
+    height: 200px;
+    min-height: 160px;
+  }
 }
 
 .nav-logout {

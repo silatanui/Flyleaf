@@ -487,10 +487,11 @@ function buttonsAvailable() {
   if (busy) return;
   const count = draft ? words(draft.value) : 0;
   const hasFile = Boolean(fileInput && fileInput.files && fileInput.files.length > 0);
-  if (checkButton) checkButton.disabled = !detectorReady || (count < 20 && !hasFile);
-  if (humanizeButton) humanizeButton.disabled = !humanizerReady || count < 8;
-  if (similarityButton) similarityButton.disabled = !similarityReady || (count < 40 && !hasFile);
-  if (offerHumanize) offerHumanize.disabled = !humanizerReady;
+  // Allow a click while models load; the job waits on the server until ready.
+  if (checkButton) checkButton.disabled = count < 20 && !hasFile;
+  if (humanizeButton) humanizeButton.disabled = count < 8;
+  if (similarityButton) similarityButton.disabled = count < 40 && !hasFile;
+  if (offerHumanize) offerHumanize.disabled = count < 8;
 }
 
 function showSimilarity(result) {
@@ -707,14 +708,15 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyBu
   let shown = 6;
   let target = 6;
   let finished = false;
-  paintProgress(shown, workingLabel);
+  let liveLabel = workingLabel;
+  paintProgress(shown, liveLabel);
   const timer = window.setInterval(() => {
     const ceiling = finished ? 100 : 94;
     if (target > ceiling) target = ceiling;
     // Ease forward only so the bar never jumps backward.
     if (target > shown) shown += Math.max(0.15, (target - shown) * 0.14);
     else if (finished && shown < 100) shown += Math.max(0.4, (100 - shown) * 0.2);
-    paintProgress(shown, finished ? doneLabel : workingLabel);
+    paintProgress(shown, finished ? doneLabel : liveLabel);
   }, 80);
 
   try {
@@ -757,6 +759,7 @@ async function runJob(url, body, isForm, workingLabel, doneLabel, onDone, busyBu
         // Keep progress monotonic: never let a later poll pull the bar back down.
         target = Math.max(target, Math.min(94, job.percent));
       }
+      if (job.message) liveLabel = job.message;
       if (job.status === "done") {
         finished = true;
         target = 100;

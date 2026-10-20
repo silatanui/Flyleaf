@@ -53,6 +53,8 @@ except Exception:
 
 from transformers import AutoConfig, AutoModel, AutoTokenizer, PreTrainedModel
 
+from detector.device import inference_device
+
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_ID = "desklib/ai-text-detector-v1.01"
 CACHE_DIR = ROOT / "models"
@@ -261,14 +263,16 @@ class Detector:
         self.error: str | None = None
         self._model = None
         self._tokenizer = None
-        self._device = torch.device("cpu")
+        self._device = inference_device()
         self._lock = threading.Lock()
 
     def load(self) -> None:
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             patch_deberta_attention()
-            torch.set_num_threads(2)
+            self._device = inference_device()
+            if self._device.type == "cpu":
+                torch.set_num_threads(2)
             source = str(LOCAL_DIR) if weights_ready() else MODEL_ID
             local_only = weights_ready()
             self._tokenizer = AutoTokenizer.from_pretrained(source, local_files_only=local_only, cache_dir=str(CACHE_DIR))

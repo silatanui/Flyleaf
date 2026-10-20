@@ -22,13 +22,13 @@
   </script>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}?v=16" type="image/svg+xml">
   <meta name="csrf-token" content="{{ csrf_token }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=79">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=80">
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}" data-signed-in="{{ '1' if account else '0' }}">
   <header class="nav">
     <div class="nav-left">
-      <a class="logo" href="{{ url_for('home') }}">
+      <a class="logo notranslate" href="{{ url_for('home') }}" translate="no">
         <span class="logo-name">Fly</span>
         <img src="{{ url_for('static', filename='favicon.svg') }}?v=16" alt="" width="28" height="28">
       </a>
@@ -126,7 +126,7 @@
   <footer class="site-footer">
     <div class="footer-grid">
       <div>
-        <a class="logo footer-logo" href="{{ url_for('home') }}">
+        <a class="logo footer-logo notranslate" href="{{ url_for('home') }}" translate="no">
           <span class="logo-name">Fly</span>
           <img src="{{ url_for('static', filename='favicon.svg') }}?v=16" alt="" width="28" height="28">
         </a>
@@ -151,7 +151,7 @@
       </div>
     </div>
     <div class="footer-bar">
-      <p>Flyleaf, 2026. Tanui Kipngetich Sila.</p>
+      <p><span class="notranslate" translate="no">Flyleaf</span>, 2026. Tanui Kipngetich Sila.</p>
       <p>
         <a href="{{ url_for('privacy') }}">Privacy</a>
         <a href="{{ url_for('terms') }}">Terms</a>
@@ -204,7 +204,7 @@
       }
     })();
   </script>
-  <script src="{{ url_for('static', filename='js/translate.js') }}?v=3"></script>
+  <script src="{{ url_for('static', filename='js/translate.js') }}?v=4"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

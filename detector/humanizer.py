@@ -15,6 +15,7 @@ from pathlib import Path
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
+from detector.device import inference_device
 from detector.engine import split_sentences, word_count
 from detector.plain import loosen
 
@@ -35,12 +36,13 @@ class Humanizer:
         self.error: str | None = None
         self._model = None
         self._tokenizer = None
-        self._device = torch.device("cpu")
+        self._device = inference_device()
         self._lock = threading.Lock()
         self._prefix = ""
         self.model_name = MODEL_ID
 
     def load(self) -> None:
+        self._device = inference_device()
         last_error: Exception | None = None
         for folder, prefix, name in self._candidates():
             try:

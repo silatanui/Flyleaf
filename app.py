@@ -74,6 +74,25 @@ def _read_upload(storage) -> tuple[str, bytes | None, str]:
     return raw.decode("utf-8", errors="replace"), None, filename
 
 
+def _wait_until_ready(job_id: str, tool, message: str, start=None, timeout: float = 900.0) -> None:
+    """Hold a queued job until the model is ready so the user can click immediately."""
+    if start is not None:
+        start()
+    deadline = time.time() + timeout
+    while tool.status == "loading":
+        if time.time() >= deadline:
+            raise TimeoutError("Flyleaf is still getting ready. Wait a minute and try again.")
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if job is not None:
+                job["message"] = message
+                job["percent"] = max(4, min(12, int(job.get("percent") or 4)))
+        _publish_job(job_id)
+        time.sleep(1.0)
+    if tool.status == "error":
+        raise RuntimeError(tool.error or "Flyleaf failed to load.")
+
+
 def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, prefix: str = "") -> None:
     def progress(done: int, total: int, message: str) -> None:
         del message
@@ -102,6 +121,7 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
     except RuntimeError:
         pass
     try:
+        _wait_until_ready(job_id, detector, "Getting the AI checker ready...", _start_model_load)
         result = detector.score(text, progress=progress)
         if pdf_bytes is not None:
             review_id = uuid.uuid4().hex
@@ -281,6 +301,7 @@ def _run_humanize(job_id: str, text: str) -> None:
 
     threading.Thread(target=beat, daemon=True).start()
     try:
+        _wait_until_ready(job_id, humanizer, "Getting the humanizer ready...", _start_model_load)
         result = humanizer.rewrite(text, progress=progress)
         with _jobs_lock:
             _jobs[job_id]["status"] = "done"
@@ -300,8 +321,7 @@ def _run_humanize(job_id: str, text: str) -> None:
 
 @app.post("/api/humanize")
 def humanize_api():
-    if humanizer.status == "loading":
-        return jsonify({"error": "The humanizer is still getting ready. Try again in a minute."}), 503
+    _start_model_load()
     if humanizer.status == "error":
         return jsonify({"error": humanizer.error or "The humanizer failed to load."}), 500
     text = ""
@@ -342,8 +362,7 @@ def upload_quota():
 
 @app.post("/api/analyze")
 def analyze():
-    if detector.status == "loading":
-        return jsonify({"error": "Flyleaf is still getting ready. Try again in a minute."}), 503
+    _start_model_load()
     if detector.status == "error":
         return jsonify({"error": detector.error or "Flyleaf failed to load."}), 500
 
@@ -418,6 +437,12 @@ def _run_similarity(
     except RuntimeError:
         pass
     try:
+        _wait_until_ready(
+            job_id,
+            similarity,
+            "Getting the similarity checker ready...",
+            _start_similarity_load,
+        )
         result = similarity.check(text, progress=progress)
         review_id = uuid.uuid4().hex
         REVIEW_DIR.mkdir(parents=True, exist_ok=True)
@@ -463,8 +488,6 @@ def _run_similarity(
 @app.post("/api/plagiarism")
 def plagiarism_api():
     _start_similarity_load()
-    if similarity.status == "loading":
-        return jsonify({"error": "The similarity checker is still getting ready. Try again in a minute."}), 503
     if similarity.status == "error":
         return jsonify({"error": similarity.error or "The similarity checker failed to load."}), 500
 

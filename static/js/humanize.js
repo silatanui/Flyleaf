@@ -32,12 +32,13 @@ function paintProgress(value) {
 }
 
 async function waitUntilReady() {
+  button.disabled = words(draft.value) < 8;
   for (;;) {
     const response = await fetch("/api/humanize/status");
     const payload = await response.json();
     if (payload.status === "ready") {
       modelState.textContent = "Ready · English · free to use";
-      button.disabled = false;
+      button.disabled = words(draft.value) < 8;
       return;
     }
     if (payload.status === "error") {
@@ -46,6 +47,7 @@ async function waitUntilReady() {
       continue;
     }
     modelState.textContent = "Flyleaf is getting the humanizer ready...";
+    button.disabled = words(draft.value) < 8;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 }

@@ -1,4 +1,38 @@
 (function () {
+  // Keep the brand name out of Google Translate; translate the surrounding copy only.
+  function protectBrand(rootNode) {
+    const skip = new Set(["SCRIPT", "STYLE", "TEXTAREA", "CODE", "PRE", "NOSCRIPT"]);
+    const walker = document.createTreeWalker(rootNode || document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || skip.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        if (parent.closest(".notranslate") || parent.translate === false) return NodeFilter.FILTER_REJECT;
+        if (!node.nodeValue || !/\bFlyleaf\b/.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const parts = node.nodeValue.split(/(\bFlyleaf\b)/g);
+      const frag = document.createDocumentFragment();
+      parts.forEach((part) => {
+        if (part === "Flyleaf") {
+          const span = document.createElement("span");
+          span.className = "notranslate";
+          span.setAttribute("translate", "no");
+          span.textContent = part;
+          frag.appendChild(span);
+        } else if (part) {
+          frag.appendChild(document.createTextNode(part));
+        }
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+
+  if (document.body) protectBrand(document.body);
+
   const root = document.querySelector("#lang-switch");
   const trigger = document.querySelector("#lang-trigger");
   const panel = document.querySelector("#lang-panel");
@@ -99,6 +133,7 @@
 
   window.googleTranslateElementInit = function () {
     if (!window.google || !google.translate) return;
+    protectBrand(document.body);
     new google.translate.TranslateElement(
       {
         pageLanguage: "en",
@@ -111,6 +146,7 @@
     const wanted = readLang();
     if (wanted && wanted !== "en") {
       window.setTimeout(() => {
+        protectBrand(document.body);
         const combo = document.querySelector(".goog-te-combo");
         if (combo && combo.value !== wanted) {
           combo.value = wanted;
