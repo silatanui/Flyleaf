@@ -488,7 +488,7 @@ def _safe_next(value: str | None) -> str:
     target = value or ""
     if target.startswith("/") and not target.startswith("//") and not re.search(r"[\s\\]", target):
         return target
-    return url_for("dashboard")
+    return url_for("home")
 
 
 def list_saved(user_id: int, kind: str | None = None) -> list[dict]:
@@ -823,7 +823,7 @@ def init_accounts(app) -> None:
     @app.get("/login")
     def login():
         if current_user():
-            return redirect(url_for("saved_list"))
+            return redirect(url_for("home"))
         return _db_page("auth.html", mode="login", error="", next_url=_safe_next(request.args.get("next")))
 
     @app.post("/login")
@@ -851,7 +851,7 @@ def init_accounts(app) -> None:
     @app.get("/register")
     def register():
         if current_user():
-            return redirect(url_for("saved_list"))
+            return redirect(url_for("home"))
         return _db_page("auth.html", mode="register", error="")
 
     @app.post("/register")
@@ -871,7 +871,7 @@ def init_accounts(app) -> None:
         except OperationalError:
             return render_template("auth.html", mode="offline", error=database_error()), 503
         _sign_in(user)
-        return redirect(url_for("saved_list"))
+        return redirect(url_for("home"))
 
     @app.get("/auth/google")
     def google_start():

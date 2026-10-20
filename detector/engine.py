@@ -26,6 +26,31 @@ try:
     torch.set_num_interop_threads(1)
 except Exception:
     pass
+
+# Some Windows hosts block scipy DLLs that sklearn pulls in. Transformers only
+# needs sklearn.metrics.roc_curve for an optional generation path we do not use.
+try:
+    from sklearn.metrics import roc_curve as _roc_curve  # noqa: F401
+except Exception:
+    import importlib.machinery
+    import sys
+    import types
+
+    def _stub_sklearn(name: str):
+        module = types.ModuleType(name)
+        module.__spec__ = importlib.machinery.ModuleSpec(name, loader=None, is_package=True)
+        module.__path__ = []
+        sys.modules[name] = module
+        return module
+
+    for _name in list(sys.modules):
+        if _name == "sklearn" or _name.startswith("sklearn."):
+            del sys.modules[_name]
+    _sklearn = _stub_sklearn("sklearn")
+    _metrics = _stub_sklearn("sklearn.metrics")
+    _metrics.roc_curve = lambda *args, **kwargs: (None, None, None)
+    _sklearn.metrics = _metrics
+
 from transformers import AutoConfig, AutoModel, AutoTokenizer, PreTrainedModel
 
 ROOT = Path(__file__).resolve().parent.parent
