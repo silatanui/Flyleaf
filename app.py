@@ -28,7 +28,13 @@ from detector.engine import detector
 from detector.humanizer import humanizer
 from detector.plagiarism import similarity
 from detector.plagiarism_pdf import build_similarity_pdf
-from detector.report_pdf import build_reviewed_pdf, build_text_reviewed_pdf, pdf_text, write_preview_images
+from detector.report_pdf import (
+    build_reviewed_pdf,
+    build_text_reviewed_pdf,
+    docx_to_pdf,
+    pdf_text,
+    write_preview_images,
+)
 
 ROOT = Path(__file__).resolve().parent
 REVIEW_DIR = ROOT / "storage" / "reviews"
@@ -64,6 +70,14 @@ def _read_upload(storage) -> tuple[str, bytes | None, str]:
     raw = storage.read()
     lower = filename.lower()
     if lower.endswith(".docx"):
+        # Prefer a layout-faithful PDF so the review keeps the Word design.
+        try:
+            pdf_bytes = docx_to_pdf(raw)
+            text = pdf_text(pdf_bytes)
+            if text.strip():
+                return text, pdf_bytes, filename
+        except Exception:
+            app.logger.exception("Could not keep Word layout for %s; falling back to plain text", filename)
         from docx import Document
 
         document = Document(io.BytesIO(raw))

@@ -75,6 +75,34 @@ def pdf_text(raw: bytes) -> str:
         document.close()
 
 
+def _docx_page_points(raw: bytes) -> tuple[float, float]:
+    """Read the Word page size in PDF points so fonts are not scaled up from 400x600."""
+    try:
+        import io
+
+        from docx import Document
+
+        section = Document(io.BytesIO(raw)).sections[0]
+        # python-docx stores page size in EMUs (914400 per inch).
+        width = float(section.page_width) / 914400.0 * 72.0
+        height = float(section.page_height) / 914400.0 * 72.0
+        if width >= 200 and height >= 200:
+            return width, height
+    except Exception:
+        pass
+    return 612.0, 792.0  # US Letter
+
+
+def docx_to_pdf(raw: bytes) -> bytes:
+    """Convert a Word file to PDF while keeping its page layout for the review."""
+    width, height = _docx_page_points(raw)
+    document = fitz.open(stream=raw, filetype="docx", rect=fitz.Rect(0, 0, width, height))
+    try:
+        return document.convert_to_pdf()
+    finally:
+        document.close()
+
+
 def _clean(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
@@ -406,12 +434,13 @@ def build_reviewed_pdf(raw: bytes, result: dict, filename: str, file_size: int =
             _use_font(new, fontname)
             _bar(new, width, height, fontname, fontobj, index + 3, total, "AI Writing Submission", title, True)
             _bar(new, width, height, fontname, fontobj, index + 3, total, "AI Writing Submission", title, False)
-            avail = fitz.Rect(18, HEADER_H + 6, width - 18, height - FOOTER_H - 6)
-            scale = min(avail.width / page.rect.width, avail.height / page.rect.height)
+            avail = fitz.Rect(10, HEADER_H + 2, width - 10, height - FOOTER_H - 2)
+            # Never enlarge the submission page — that made Word fonts look oversized.
+            scale = min(1.0, avail.width / page.rect.width, avail.height / page.rect.height)
             draw_w = page.rect.width * scale
             draw_h = page.rect.height * scale
             x0 = avail.x0 + (avail.width - draw_w) / 2
-            y0 = avail.y0 + (avail.height - draw_h) / 2
+            y0 = avail.y0
             new.show_pdf_page(fitz.Rect(x0, y0, x0 + draw_w, y0 + draw_h), source, index)
 
         output.set_metadata(
