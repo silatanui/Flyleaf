@@ -428,6 +428,127 @@ def build_reviewed_pdf(raw: bytes, result: dict, filename: str, file_size: int =
         source.close()
 
 
+def build_text_reviewed_pdf(text: str, result: dict, filename: str, file_size: int = 0) -> bytes:
+    """Build the same AI report for .docx / .txt uploads (cover, overview, marked draft)."""
+    fontobj, fontname = _font()
+    width, height = 595, 842
+    title = _clean(filename)[:80] or "Draft"
+    body = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    payload = dict(result)
+    payload.setdefault("character_count", len(body))
+    payload.setdefault("word_count", len(re.findall(r"\b[\w']+\b", body)))
+
+    output = fitz.open()
+    output.new_page(width=width, height=height)  # cover
+    output.new_page(width=width, height=height)  # overview
+    body_start = output.page_count
+    _layout_marked_text(output, width, height, fontname, fontobj, body, result, body_start)
+
+    total = output.page_count
+    payload["source_pages"] = max(0, total - 2)
+    # Draw after bake so page handles stay valid.
+    _cover(output[0], width, fontname, fontobj, payload, title, file_size or len(body.encode("utf-8")), total)
+    _overview(output[1], width, fontname, fontobj, payload, title, total)
+
+    for index in range(body_start, total):
+        page = output[index]
+        _use_font(page, fontname)
+        _bar(page, width, height, fontname, fontobj, index + 1, total, "AI Writing Submission", title, True, heavy=True)
+        _bar(page, width, height, fontname, fontobj, index + 1, total, "AI Writing Submission", title, False, heavy=True)
+
+    output.set_metadata(
+        {
+            "title": f"Flyleaf review: {title}",
+            "author": "Tanui Kipngetich Sila",
+            "subject": "AI writing report",
+        }
+    )
+    data = output.tobytes()
+    output.close()
+    return data
+
+
+def _layout_marked_text(
+    output,
+    width,
+    height,
+    fontname,
+    fontobj,
+    text: str,
+    result: dict,
+    body_start: int,
+) -> None:
+    size = 11
+    leading = 15
+    left = 48
+    right = width - 48
+    top = HEADER_H + 28
+    bottom = height - FOOTER_H - 20
+    content_w = right - left
+
+    page = output.new_page(width=width, height=height)
+    _use_font(page, fontname)
+    y = top
+
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()] if text else []
+    if text and not paragraphs:
+        paragraphs = [text]
+    if not paragraphs:
+        _put(page, (left, y), "No draft text was available to print.", size, fontname, INK, heavy=True)
+
+    for paragraph in paragraphs:
+        words = paragraph.split()
+        if not words:
+            continue
+        line = ""
+        for word in words:
+            trial = word if not line else f"{line} {word}"
+            if _width(fontobj, trial, size) <= content_w:
+                line = trial
+                continue
+            if y + leading > bottom:
+                page = output.new_page(width=width, height=height)
+                _use_font(page, fontname)
+                y = top
+            if line:
+                _put(page, (left, y), line, size, fontname, INK, heavy=True)
+                y += leading
+            line = word
+        if line:
+            if y + leading > bottom:
+                page = output.new_page(width=width, height=height)
+                _use_font(page, fontname)
+                y = top
+            _put(page, (left, y), line, size, fontname, INK, heavy=True)
+            y += leading
+        y += 10
+
+    marked = [item for item in result.get("sentences", []) if item.get("label") in {"ai", "uncertain"}]
+    for page_index in range(body_start, output.page_count):
+        page = output[page_index]
+        for item in marked:
+            excerpt = _clean(str(item.get("text") or ""))
+            if len(excerpt.split()) < 3:
+                continue
+            probes = [excerpt]
+            words = excerpt.split()
+            if len(words) > 18:
+                probes.append(" ".join(words[:18]))
+                probes.append(" ".join(words[len(words) // 2 : len(words) // 2 + 18]))
+            stroke = CYAN if item.get("label") == "ai" else PURPLE
+            for probe in probes:
+                rects = page.search_for(probe, quads=False)
+                if not rects and len(probe.split()) > 8:
+                    rects = page.search_for(" ".join(probe.split()[:8]), quads=False)
+                if not rects:
+                    continue
+                annot = page.add_highlight_annot(rects)
+                annot.set_colors(stroke=stroke)
+                annot.update()
+                break
+    output.bake(annots=True)
+
+
 def write_preview_images(pdf: bytes, folder: Path) -> int:
     folder.mkdir(parents=True, exist_ok=True)
     document = fitz.open(stream=pdf, filetype="pdf")

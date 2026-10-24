@@ -21,7 +21,7 @@
       </label>
       <input id="doc-file" type="file" accept=".pdf,application/pdf">
       {% else %}
-      <p class="limit-note">You have used today's 5 free PDF uploads.</p>
+      <p class="limit-note">You have used today's 5 free document uploads.</p>
       {% endif %}
     </div>
     <p id="doc-note" class="doc-note" role="status"></p>
@@ -87,7 +87,7 @@ new DataTable("#documents", {
   autoWidth: false,
   columnDefs: [{ orderable: false, targets: 3 }],
   language: {
-    emptyTable: "No documents yet. Upload a PDF to keep the report here.",
+    emptyTable: "No documents yet. Upload a PDF, Word, or text file to keep the report here.",
     search: "Search:",
     lengthMenu: "Show _MENU_",
     info: "Showing _START_ to _END_ of _TOTAL_",
@@ -112,7 +112,7 @@ if (docFile) {
     const file = docFile.files[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
-      docNote.textContent = "Upload a PDF. Flyleaf keeps a report for PDF files.";
+      docNote.textContent = "Upload a PDF, Word, or text file. Flyleaf keeps a PDF report.";
       docFile.value = "";
       return;
     }

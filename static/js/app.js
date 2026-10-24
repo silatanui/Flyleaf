@@ -86,6 +86,13 @@ function selectedPdf() {
   return Boolean(file && file.name.toLowerCase().endsWith(".pdf"));
 }
 
+function selectedUpload() {
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) return false;
+  const name = file.name.toLowerCase();
+  return name.endsWith(".pdf") || name.endsWith(".docx") || name.endsWith(".txt");
+}
+
 function readingOf(flagged, uncertain) {
   const ai = Math.max(0, Math.round(Number(flagged) || 0));
   const mid = Math.max(0, Math.round(Number(uncertain) || 0));
@@ -809,8 +816,8 @@ async function assertPdfUploadAllowed() {
 
 if (draft) {
 checkButton.addEventListener("click", async () => {
-  if (selectedPdf() || (fileInput.files.length > 0 && words(draft.value) < 20)) {
-    if (selectedPdf() || (fileInput.files[0] && fileInput.files[0].name.toLowerCase().endsWith(".pdf"))) {
+  if (selectedUpload() || (fileInput.files.length > 0 && words(draft.value) < 20)) {
+    if (selectedUpload()) {
       if (!(await assertPdfUploadAllowed())) return;
     }
     const form = new FormData();
@@ -827,7 +834,7 @@ checkButton.addEventListener("click", async () => {
       };
       if (chosen && result.review_id && document.body.dataset.signedIn === "1") {
         keepUpload(chosen.name, result).then(openReview).catch((error) => {
-          window.alert(error.message || "That PDF could not be kept.");
+          window.alert(error.message || "That document could not be kept.");
         });
         return;
       }

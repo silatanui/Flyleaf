@@ -28,7 +28,7 @@ from detector.engine import detector
 from detector.humanizer import humanizer
 from detector.plagiarism import similarity
 from detector.plagiarism_pdf import build_similarity_pdf
-from detector.report_pdf import build_reviewed_pdf, pdf_text, write_preview_images
+from detector.report_pdf import build_reviewed_pdf, build_text_reviewed_pdf, pdf_text, write_preview_images
 
 ROOT = Path(__file__).resolve().parent
 REVIEW_DIR = ROOT / "storage" / "reviews"
@@ -93,7 +93,14 @@ def _wait_until_ready(job_id: str, tool, message: str, start=None, timeout: floa
         raise RuntimeError(tool.error or "Flyleaf failed to load.")
 
 
-def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, prefix: str = "") -> None:
+def _run_job(
+    job_id: str,
+    text: str,
+    pdf_bytes: bytes | None,
+    filename: str,
+    prefix: str = "",
+    from_upload: bool = False,
+) -> None:
     def progress(done: int, total: int, message: str) -> None:
         del message
         with _jobs_lock:
@@ -123,11 +130,20 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
     try:
         _wait_until_ready(job_id, detector, "Getting the AI checker ready...", _start_model_load)
         result = detector.score(text, progress=progress)
-        if pdf_bytes is not None:
+        # PDF uploads keep the original pages. Doc/txt uploads get a generated PDF review.
+        if pdf_bytes is not None or from_upload:
             review_id = uuid.uuid4().hex
             REVIEW_DIR.mkdir(parents=True, exist_ok=True)
             path = REVIEW_DIR / f"{review_id}.pdf"
-            report = build_reviewed_pdf(pdf_bytes, result, filename, file_size=len(pdf_bytes))
+            if pdf_bytes is not None:
+                report = build_reviewed_pdf(pdf_bytes, result, filename, file_size=len(pdf_bytes))
+            else:
+                report = build_text_reviewed_pdf(
+                    text,
+                    result,
+                    filename,
+                    file_size=len(text.encode("utf-8")),
+                )
             path.write_bytes(report)
             page_count = write_preview_images(report, REVIEW_DIR / review_id)
             summary = {
@@ -151,7 +167,7 @@ def _run_job(job_id: str, text: str, pdf_bytes: bytes | None, filename: str, pre
             _jobs[job_id]["status"] = "done"
             _jobs[job_id]["percent"] = 100
             _jobs[job_id]["result"] = result
-            _jobs[job_id]["message"] = "Report ready"
+            _jobs[job_id]["message"] = "Opening the review" if result.get("review_url") else "Report ready"
         _publish_job(job_id)
     except Exception as exc:
         with _jobs_lock:
@@ -376,7 +392,8 @@ def analyze():
         text = request.form.get("text") or ""
 
     text = text.strip()
-    if pdf_bytes is not None:
+    from_upload = bool(request.files.get("file"))
+    if from_upload:
         allowed, message = can_upload_pdf(current_user())
         if not allowed:
             return jsonify({"error": message}), 403
@@ -398,7 +415,7 @@ def analyze():
         }
     prefix = request.script_root.rstrip("/")
     _publish_job(job_id)
-    if not _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix)):
+    if not _spawn(_run_job, (job_id, text, pdf_bytes, filename, prefix, from_upload)):
         return jsonify({"error": "The host could not start the check. Wait a minute and try again."}), 503
     return jsonify({"job_id": job_id, "status": "running", "watch_url": f"{prefix}/jobs/{job_id}.json"})
 

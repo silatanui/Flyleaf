@@ -538,13 +538,13 @@ def is_admin_user(user: dict | None) -> bool:
 
 
 def can_upload_pdf(user: dict | None) -> tuple[bool, str]:
-    """PDF uploads only. Pasted checks stay free and uncapped."""
+    """File uploads that produce a PDF review. Pasted checks stay free and uncapped."""
     if user is None:
-        return False, "Sign in to upload a PDF. Pasted text on the checker stays free."
+        return False, "Sign in to upload a document. Pasted text on the checker stays free."
     if is_admin_user(user):
         return True, ""
     if uploads_today(int(user["id"])) >= FREE_DAILY_UPLOADS:
-        return False, "The free plan includes 5 PDF uploads a day. Pasted text stays free. Try again tomorrow."
+        return False, "The free plan includes 5 document uploads a day. Pasted text stays free. Try again tomorrow."
     return True, ""
 
 
@@ -686,8 +686,9 @@ def _file_title(name: str) -> str:
 def keep_document(user_id: int, filename: str, result: dict, review_id: str, user: dict | None = None) -> int:
     del result
     title = _file_title(filename)
-    if not title.lower().endswith(".pdf"):
-        raise ValueError("Upload a PDF. Flyleaf keeps a report for PDF files.")
+    lower = title.lower()
+    if not (lower.endswith(".pdf") or lower.endswith(".docx") or lower.endswith(".txt")):
+        raise ValueError("Upload a PDF, Word, or text file. Flyleaf keeps a PDF report for those uploads.")
     if not review_id or not _REVIEW_ID.fullmatch(review_id):
         raise ValueError("That file did not produce a PDF report.")
     existing = saved_id_for_review(user_id, review_id)
@@ -695,7 +696,7 @@ def keep_document(user_id: int, filename: str, result: dict, review_id: str, use
         return existing
     allowed, message = can_upload_pdf(user or {"id": user_id, "email": "", "role": "member"})
     if not allowed:
-        raise ValueError(message or "The free plan includes 5 PDF uploads a day. Try again tomorrow.")
+        raise ValueError(message or "The free plan includes 5 document uploads a day. Try again tomorrow.")
     meta = REVIEW_DIR / f"{review_id}.json"
     pdf = REVIEW_DIR / f"{review_id}.pdf"
     if not meta.is_file() or not pdf.is_file():
