@@ -75,32 +75,11 @@ def pdf_text(raw: bytes) -> str:
         document.close()
 
 
-def _docx_page_points(raw: bytes) -> tuple[float, float]:
-    """Read the Word page size in PDF points so fonts are not scaled up from 400x600."""
-    try:
-        import io
-
-        from docx import Document
-
-        section = Document(io.BytesIO(raw)).sections[0]
-        # python-docx stores page size in EMUs (914400 per inch).
-        width = float(section.page_width) / 914400.0 * 72.0
-        height = float(section.page_height) / 914400.0 * 72.0
-        if width >= 200 and height >= 200:
-            return width, height
-    except Exception:
-        pass
-    return 612.0, 792.0  # US Letter
-
-
 def docx_to_pdf(raw: bytes) -> bytes:
     """Convert a Word file to PDF while keeping its page layout for the review."""
-    width, height = _docx_page_points(raw)
-    document = fitz.open(stream=raw, filetype="docx", rect=fitz.Rect(0, 0, width, height))
-    try:
-        return document.convert_to_pdf()
-    finally:
-        document.close()
+    from detector.docx_pdf import docx_to_pdf as _convert
+
+    return _convert(raw)
 
 
 def _clean(value: str) -> str:
